@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Home Base</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Met's Bookmarks</title>
 <style>
   :root{
     --bg: #0a0d13;
@@ -42,12 +40,12 @@
       radial-gradient(ellipse 80% 50% at 50% -10%, #5ccfe611, transparent),
       repeating-linear-gradient(0deg, #ffffff05 0px, transparent 1px, transparent 2px);
     color: var(--text);
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: Georgia, 'Times New Roman', serif;
     min-height: 100vh;
     padding: 28px 20px 60px;
   }
 
-  .mono{ font-family: 'JetBrains Mono', monospace; }
+  .mono{ font-family: Georgia, 'Times New Roman', serif; }
 
   /* ---------- Header ---------- */
   header{
@@ -65,7 +63,7 @@
   }
 
   h1{
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 28px;
     font-weight: 700;
     letter-spacing: -0.01em;
@@ -75,11 +73,12 @@
     gap: 10px;
   }
 
-  h1 .dot{
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--accent);
+  h1 .brand-icon{
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
     box-shadow: 0 0 10px 2px var(--accent-dim);
-    animation: pulse 2.4s ease-in-out infinite;
+    flex-shrink: 0;
   }
 
   #clock{
@@ -103,7 +102,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     color: var(--text);
-    font-family: 'Inter', sans-serif;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 14px;
     padding: 12px 16px;
     outline: none;
@@ -124,7 +123,7 @@
     background: var(--bg-elevated);
     border: 1px solid var(--border);
     color: var(--text-muted);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 12px;
     padding: 7px 13px;
     border-radius: 999px;
@@ -156,7 +155,7 @@
   }
 
   .section-head h2{
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 14px;
     font-weight: 600;
     letter-spacing: 0.08em;
@@ -173,7 +172,7 @@
   }
 
   .section-head .count{
-    font-family: 'JetBrains Mono', monospace;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 12px;
     color: var(--text-faint);
   }
@@ -217,7 +216,7 @@
     flex-shrink: 0;
     background: var(--bg);
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 12px; font-weight: 600;
     color: var(--text-faint);
     overflow: hidden;
@@ -236,7 +235,7 @@
   }
 
   .card-status{
-    font-family: 'JetBrains Mono', monospace;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 10.5px;
     color: var(--status-color, var(--text-muted));
     margin-top: 2px;
@@ -255,7 +254,7 @@
     display: none;
     text-align: center;
     color: var(--text-faint);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 13px;
     padding: 60px 0;
   }
@@ -282,17 +281,11 @@
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 5px 8px;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: Georgia, 'Times New Roman', serif;
     font-size: 12px;
   }
 
-  @keyframes pulse{
-    0%, 100% { opacity: 1; }
-    50% { opacity: .4; }
-  }
-
   @media (prefers-reduced-motion: reduce){
-    .dot{ animation: none; }
     html{ scroll-behavior: auto; }
   }
 
@@ -308,7 +301,7 @@
 
 <header>
   <div class="header-row">
-    <h1><span class="dot"></span>Met's Bookmarks</h1>
+    <h1><img class="brand-icon" src="uga.svg" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 40 40%27><circle cx=%2720%27 cy=%2720%27 r=%2718%27 fill=%27%235ccfe6%27/></svg>'">Met's Bookmarks</h1>
     <div id="clock" class="mono"></div>
   </div>
   <div class="search-row">
@@ -345,8 +338,7 @@
    ========================================================= */
 const LINKS = [
   // --- Social Media ---
-  { name: "Facebook", url: "https://www.facebook.com/", category: "Social Media" },
-  { name: "Twitter", url: "https://x.com", category: "Social Media" },
+  { name: "X / Twitter", url: "https://x.com", category: "Social Media" },
   { name: "Instagram", url: "https://instagram.com", category: "Social Media" },
   { name: "Reddit", url: "https://reddit.com", category: "Social Media" },
   { name: "LinkedIn", url: "https://linkedin.com", category: "Social Media" },
@@ -481,12 +473,34 @@ function renderChips(){
 
 searchEl.addEventListener('input', render);
 
-/* ---------- clock ---------- */
+/* ---------- clock ----------
+   Eastern time uses the America/New_York time zone, so the
+   EDT/EST label and the hour itself both flip automatically
+   at Daylight Saving transitions — nothing to update by hand. */
+function part(parts, type){ return parts.find(p => p.type === type)?.value || ''; }
+
 function tick(){
   const now = new Date();
-  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-  document.getElementById('clock').innerHTML = `<span>${time}</span> · ${date}`;
+
+  const etParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric', minute: '2-digit', second: '2-digit',
+    hour12: true, timeZoneName: 'short'
+  }).formatToParts(now);
+  const etTime = `${part(etParts,'hour')}:${part(etParts,'minute')}:${part(etParts,'second')} ${part(etParts,'dayPeriod')} ${part(etParts,'timeZoneName')}`;
+
+  const utcParts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+  }).formatToParts(now);
+  const utcTime = `${part(utcParts,'hour')}:${part(utcParts,'minute')}:${part(utcParts,'second')} Z`;
+
+  const dateStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
+  }).format(now);
+
+  document.getElementById('clock').innerHTML =
+    `<span>${etTime}</span> | <span>${utcTime}</span> | <span>${dateStr}</span>`;
 }
 tick();
 setInterval(tick, 1000);
