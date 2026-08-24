@@ -250,6 +250,75 @@
     box-shadow: 0 0 6px 1px var(--status-color, transparent);
   }
 
+  /* ---------- Sub-category group cards ---------- */
+  .group-card{
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: border-color .15s ease;
+  }
+  .group-card:hover{ border-color: var(--border-hover); }
+
+  .group-head{ display: flex; align-items: stretch; }
+
+  .group-link{
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px 6px 12px 14px;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .group-link:focus-visible{ outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .group-count{
+    color: var(--text-faint);
+    font-size: 12px;
+    margin-left: 4px;
+  }
+
+  .group-toggle{
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    transition: color .15s ease;
+  }
+  .group-toggle:hover{ color: var(--accent); }
+  .group-toggle:focus-visible{ outline: 2px solid var(--accent); outline-offset: -2px; }
+  .group-toggle svg{ width: 13px; height: 13px; transition: transform .2s ease; }
+  .group-card.expanded .group-toggle svg{ transform: rotate(180deg); }
+
+  .group-children{
+    display: none;
+    flex-direction: column;
+    gap: 1px;
+    border-top: 1px solid var(--border);
+    padding: 6px 14px 8px 50px;
+  }
+  .group-card.expanded .group-children{ display: flex; }
+
+  .child-link{
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 5px 6px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: color .15s ease, background .15s ease;
+  }
+  .child-link::before{ content: "–"; color: var(--text-faint); }
+  .child-link:hover{ color: var(--text); background: var(--bg-hover); }
+  .child-link:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
   #empty-state{
     display: none;
     text-align: center;
@@ -339,6 +408,13 @@
    Optional:
      status: { label: "TEXT", color: "css-color" }  -> colored dot + left border
 
+   SUB-CATEGORIES (e.g. Reddit -> subreddits):
+     1. Give the parent an id:           id: "reddit"
+     2. Give each child a parent field:  parent: "reddit"
+   Children don't need their own category — they inherit the
+   parent's spot in the grid and appear in a collapsible list
+   under it. Any link can be a parent; nesting is one level deep.
+
    Categories are generated automatically from whatever you
    use below — add a new category name and it just shows up.
    ========================================================= */
@@ -346,7 +422,10 @@ const LINKS = [
   // --- Social Media ---
   { name: "X / Twitter", url: "https://x.com", category: "Social Media" },
   { name: "Instagram", url: "https://instagram.com", category: "Social Media" },
-  { name: "Reddit", url: "https://reddit.com", category: "Social Media" },
+  { id: "reddit", name: "Reddit", url: "https://reddit.com", category: "Social Media" },
+  { name: "r/technology", url: "https://reddit.com/r/technology", category: "Social Media", parent: "reddit" },
+  { name: "r/dataisbeautiful", url: "https://reddit.com/r/dataisbeautiful", category: "Social Media", parent: "reddit" },
+  { name: "r/AskReddit", url: "https://reddit.com/r/AskReddit", category: "Social Media", parent: "reddit" },
   { name: "LinkedIn", url: "https://linkedin.com", category: "Social Media" },
 
   // --- Marine & Surf ---
@@ -405,6 +484,15 @@ const emptyQuery = document.getElementById('empty-query');
 const categories = [...new Set(LINKS.map(l => l.category))];
 let activeCategory = 'All';
 
+// Map of parent id -> array of its child links (sub-categories)
+const childrenMap = {};
+LINKS.forEach(l => {
+  if (l.parent){
+    (childrenMap[l.parent] ||= []).push(l);
+  }
+});
+const expandedGroups = new Set();
+
 function faviconFor(url){
   try {
     const u = new URL(url);
@@ -430,6 +518,33 @@ function cardHTML(link){
     </a>`;
 }
 
+function childLinkHTML(child){
+  return `<a class="child-link" href="${child.url}" target="_blank" rel="noopener">${child.name}</a>`;
+}
+
+function groupCardHTML(item, childrenToShow, isExpanded){
+  const fav = faviconFor(item.url);
+  const initial = item.name.trim()[0]?.toUpperCase() || '?';
+  return `
+    <div class="card group-card ${isExpanded ? 'expanded' : ''}">
+      <div class="group-head">
+        <a class="group-link" href="${item.url}" target="_blank" rel="noopener">
+          <span class="favicon">
+            <img src="${fav}" alt="" loading="lazy" onerror="this.remove()">
+            ${!fav ? initial : ''}
+          </span>
+          <span class="card-text">
+            <div class="card-name">${item.name}<span class="group-count">${childrenToShow.length}</span></div>
+          </span>
+        </a>
+        <button class="group-toggle" data-group="${item.id}" aria-expanded="${isExpanded}" aria-label="Toggle ${item.name} sub-links">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+      </div>
+      <div class="group-children">${childrenToShow.map(childLinkHTML).join('')}</div>
+    </div>`;
+}
+
 function render(){
   const query = searchEl.value.trim().toLowerCase();
   main.innerHTML = '';
@@ -438,13 +553,33 @@ function render(){
   categories.forEach(cat => {
     if (activeCategory !== 'All' && activeCategory !== cat) return;
 
-    const items = LINKS.filter(l =>
-      l.category === cat &&
-      (l.name.toLowerCase().includes(query) || l.category.toLowerCase().includes(query))
-    );
-    if (items.length === 0) return;
+    // Top-level items only — children render nested inside their parent's card.
+    const topLevel = LINKS.filter(l => l.category === cat && !l.parent);
+    const htmlParts = [];
 
-    totalShown += items.length;
+    topLevel.forEach(item => {
+      const children = childrenMap[item.id];
+
+      if (children){
+        const directMatch = !query || item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
+        const matchingChildren = children.filter(c => c.name.toLowerCase().includes(query));
+        if (query && !directMatch && matchingChildren.length === 0) return; // no match anywhere in this group
+
+        const childrenToShow = query && !directMatch ? matchingChildren : children;
+        const forceExpand = query && (matchingChildren.length > 0);
+        const isExpanded = expandedGroups.has(item.id) || forceExpand;
+
+        htmlParts.push(groupCardHTML(item, childrenToShow, isExpanded));
+        totalShown += 1 + childrenToShow.length;
+      } else {
+        const matches = item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
+        if (!matches) return;
+        htmlParts.push(cardHTML(item));
+        totalShown += 1;
+      }
+    });
+
+    if (htmlParts.length === 0) return;
 
     const section = document.createElement('section');
     section.className = 'section';
@@ -452,9 +587,9 @@ function render(){
       <div class="section-head">
         <h2>${cat}</h2>
         <div class="rule"></div>
-        <div class="count mono">${items.length}</div>
+        <div class="count mono">${htmlParts.length}</div>
       </div>
-      <div class="grid">${items.map(cardHTML).join('')}</div>
+      <div class="grid">${htmlParts.join('')}</div>
     `;
     main.appendChild(section);
   });
@@ -462,6 +597,14 @@ function render(){
   emptyState.style.display = totalShown === 0 ? 'block' : 'none';
   emptyQuery.textContent = query;
 }
+
+main.addEventListener('click', e => {
+  const btn = e.target.closest('.group-toggle');
+  if (!btn) return;
+  const id = btn.dataset.group;
+  if (expandedGroups.has(id)) expandedGroups.delete(id); else expandedGroups.add(id);
+  render();
+});
 
 function renderChips(){
   const all = ['All', ...categories];
