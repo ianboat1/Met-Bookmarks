@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Base</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a0d13;
+    --bg-elevated: #12161f;
+    --bg-hover: #171c28;
+    --border: #1f2532;
+    --border-hover: #2c3345;
+    --text: #e8ebf2;
+    --text-muted: #7d8598;
+    --text-faint: #4d5468;
+    --accent: #5ccfe6;
+    --accent-dim: #5ccfe633;
+    --accent-warm: #ffb454;
+    --radius: 10px;
+
+    /* Reserved status palette — SPC Convective Outlook scale.
+       These colors are ONLY used for live-status indicators, never
+       for general UI, so they keep their meaning at a glance. */
+    --status-tstm: #7bbd8e;
+    --status-mrgl: #3f8f5f;
+    --status-slgt: #e8c547;
+    --status-enh:  #e8973f;
+    --status-mdt:  #d1503a;
+    --status-high: #c25bc2;
+  }
+
+  *{ box-sizing: border-box; }
+  html{ scroll-behavior: smooth; }
+
+  body{
+    margin: 0;
+    background: var(--bg);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, #5ccfe611, transparent),
+      repeating-linear-gradient(0deg, #ffffff05 0px, transparent 1px, transparent 2px);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 28px 20px 60px;
+  }
+
+  .mono{ font-family: 'JetBrains Mono', monospace; }
+
+  /* ---------- Header ---------- */
+  header{
+    max-width: 1200px;
+    margin: 0 auto 28px;
+  }
+
+  .header-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+
+  h1{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h1 .dot{
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 10px 2px var(--accent-dim);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+
+  #clock{
+    color: var(--text-muted);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    text-align: right;
+  }
+
+  #clock span{ color: var(--text); }
+
+  .search-row{
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  #search{
+    flex: 1;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color .15s ease;
+  }
+
+  #search::placeholder{ color: var(--text-faint); }
+  #search:focus{ border-color: var(--accent); }
+  #search:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .chips{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .chip{
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all .15s ease;
+    white-space: nowrap;
+  }
+
+  .chip:hover{ border-color: var(--border-hover); color: var(--text); }
+  .chip:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .chip.active{
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* ---------- Sections ---------- */
+  main{ max-width: 1200px; margin: 0 auto; }
+
+  .section{ margin-bottom: 34px; }
+  .section.hidden{ display: none; }
+
+  .section-head{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .section-head h2{
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .section-head .rule{
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .section-head .count{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  .grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 10px;
+  }
+
+  /* ---------- Cards ---------- */
+  .card{
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    text-decoration: none;
+    color: var(--text);
+    transition: border-color .15s ease, background .15s ease, transform .1s ease;
+  }
+
+  .card:hover{
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+  }
+
+  .card:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .card.has-status{
+    border-left: 3px solid var(--status-color, var(--accent));
+  }
+
+  .favicon{
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    flex-shrink: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-faint);
+    overflow: hidden;
+  }
+
+  .favicon img{ width: 100%; height: 100%; object-fit: cover; }
+
+  .card-text{ min-width: 0; flex: 1; }
+
+  .card-name{
+    font-size: 13.5px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-status{
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--status-color, var(--text-muted));
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .card-status .status-dot{
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--status-color, var(--text-muted));
+    box-shadow: 0 0 6px 1px var(--status-color, transparent);
+  }
+
+  #empty-state{
+    display: none;
+    text-align: center;
+    color: var(--text-faint);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    padding: 60px 0;
+  }
+
+  /* ---------- Status demo control ---------- */
+  .status-demo{
+    max-width: 1200px;
+    margin: 0 auto 30px;
+    background: var(--bg-elevated);
+    border: 1px dashed var(--border-hover);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .status-demo select{
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+
+  @keyframes pulse{
+    0%, 100% { opacity: 1; }
+    50% { opacity: .4; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .dot{ animation: none; }
+    html{ scroll-behavior: auto; }
+  }
+
+  @media (max-width: 600px){
+    h1{ font-size: 22px; }
+    .header-row{ flex-direction: column; align-items: flex-start; }
+    #clock{ text-align: left; }
+    .grid{ grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1><span class="dot"></span>Home Base</h1>
+    <div id="clock" class="mono"></div>
+  </div>
+  <div class="search-row">
+    <input id="search" type="text" placeholder="Search your links…" autocomplete="off">
+  </div>
+  <div id="chips" class="chips"></div>
+</header>
+
+<div class="status-demo">
+  ⚡ <strong style="color:var(--text)">Status-coding demo</strong> — the SPC Convective Outlook card below changes color with this dropdown, previewing how "live" cards can look. Try it:
+  <select id="spc-demo">
+    <option value="tstm">TSTM (general t-storm)</option>
+    <option value="mrgl">MRGL</option>
+    <option value="slgt">SLGT</option>
+    <option value="enh" selected>ENH</option>
+    <option value="mdt">MDT</option>
+    <option value="high">HIGH</option>
+  </select>
+</div>
+
+<main id="main"></main>
+<p id="empty-state">No links match “<span id="empty-query" class="mono"></span>”</p>
+
+<script>
+/* =========================================================
+   YOUR DATA
+   Add, edit, or delete entries here. Every card needs:
+     name, url, category
+   Optional:
+     status: { label: "TEXT", color: "css-color" }  -> colored dot + left border
+
+   Categories are generated automatically from whatever you
+   use below — add a new category name and it just shows up.
+   ========================================================= */
+const LINKS = [
+  // --- Social Media ---
+  { name: "X / Twitter", url: "https://x.com", category: "Social Media" },
+  { name: "Instagram", url: "https://instagram.com", category: "Social Media" },
+  { name: "Reddit", url: "https://reddit.com", category: "Social Media" },
+  { name: "LinkedIn", url: "https://linkedin.com", category: "Social Media" },
+
+  // --- Marine & Surf ---
+  { name: "NOAA Tides & Currents", url: "https://tidesandcurrents.noaa.gov", category: "Marine & Surf" },
+  { name: "Surfline", url: "https://surfline.com", category: "Marine & Surf" },
+  { name: "Windy", url: "https://windy.com", category: "Marine & Surf" },
+  { name: "NDBC Buoy Data", url: "https://ndbc.noaa.gov", category: "Marine & Surf" },
+
+  // --- Hydrology ---
+  { name: "USGS Water Data", url: "https://waterdata.usgs.gov", category: "Hydrology" },
+  { name: "NWS River Forecast", url: "https://water.weather.gov", category: "Hydrology" },
+
+  // --- Weather & Alerts (bonus category showing the status feature) ---
+  { name: "SPC Convective Outlook", url: "https://www.spc.noaa.gov/products/outlook/", category: "Weather & Alerts",
+    status: { label: "ENH", color: "var(--status-enh)" } },
+  { name: "NWS Local Forecast", url: "https://forecast.weather.gov", category: "Weather & Alerts" },
+
+  // --- Sunrise & Sunset Tables ---
+  { name: "TimeAndDate Sun Table", url: "https://www.timeanddate.com/sun/", category: "Sunrise & Sunset Tables" },
+  { name: "Sunrise-Sunset.org", url: "https://sunrise-sunset.org", category: "Sunrise & Sunset Tables" },
+
+  // --- Finances ---
+  { name: "Bank Login", url: "https://example-bank.com", category: "Finances" },
+  { name: "Credit Card Portal", url: "https://example-cc.com", category: "Finances" },
+  { name: "Budget Sheet", url: "https://sheets.google.com", category: "Finances" },
+
+  // --- Utilities ---
+  { name: "Electric Company", url: "https://example-electric.com", category: "Utilities" },
+  { name: "Water Utility", url: "https://example-water.com", category: "Utilities" },
+  { name: "Internet Provider", url: "https://example-isp.com", category: "Utilities" },
+
+  // --- Healthcare ---
+  { name: "Patient Portal", url: "https://example-mychart.com", category: "Healthcare" },
+  { name: "Pharmacy Refills", url: "https://example-pharmacy.com", category: "Healthcare" },
+
+  // --- Admin ---
+  { name: "DMV", url: "https://example-dmv.gov", category: "Admin" },
+  { name: "IRS", url: "https://irs.gov", category: "Admin" },
+
+  // --- Food & Drink ---
+  { name: "Recipe Box (Drive)", url: "https://drive.google.com", category: "Food & Drink" },
+  { name: "Grocery Delivery", url: "https://example-grocery.com", category: "Food & Drink" },
+
+  // --- Insurance ---
+  { name: "Home Insurance", url: "https://example-homeins.com", category: "Insurance" },
+  { name: "Auto Insurance", url: "https://example-autoins.com", category: "Insurance" },
+];
+
+/* ---------- render ---------- */
+const main = document.getElementById('main');
+const chipsEl = document.getElementById('chips');
+const searchEl = document.getElementById('search');
+const emptyState = document.getElementById('empty-state');
+const emptyQuery = document.getElementById('empty-query');
+
+const categories = [...new Set(LINKS.map(l => l.category))];
+let activeCategory = 'All';
+
+function faviconFor(url){
+  try {
+    const u = new URL(url);
+    return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(u.origin)}`;
+  } catch { return ''; }
+}
+
+function cardHTML(link){
+  const hasStatus = !!link.status;
+  const styleAttr = hasStatus ? `style="--status-color:${link.status.color}"` : '';
+  const initial = link.name.trim()[0]?.toUpperCase() || '?';
+  const fav = faviconFor(link.url);
+  return `
+    <a class="card ${hasStatus ? 'has-status' : ''}" ${styleAttr} href="${link.url}" target="_blank" rel="noopener">
+      <span class="favicon">
+        <img src="${fav}" alt="" loading="lazy" onerror="this.remove()">
+        ${!fav ? initial : ''}
+      </span>
+      <span class="card-text">
+        <div class="card-name">${link.name}</div>
+        ${hasStatus ? `<div class="card-status"><span class="status-dot"></span>${link.status.label}</div>` : ''}
+      </span>
+    </a>`;
+}
+
+function render(){
+  const query = searchEl.value.trim().toLowerCase();
+  main.innerHTML = '';
+  let totalShown = 0;
+
+  categories.forEach(cat => {
+    if (activeCategory !== 'All' && activeCategory !== cat) return;
+
+    const items = LINKS.filter(l =>
+      l.category === cat &&
+      (l.name.toLowerCase().includes(query) || l.category.toLowerCase().includes(query))
+    );
+    if (items.length === 0) return;
+
+    totalShown += items.length;
+
+    const section = document.createElement('section');
+    section.className = 'section';
+    section.innerHTML = `
+      <div class="section-head">
+        <h2>${cat}</h2>
+        <div class="rule"></div>
+        <div class="count mono">${items.length}</div>
+      </div>
+      <div class="grid">${items.map(cardHTML).join('')}</div>
+    `;
+    main.appendChild(section);
+  });
+
+  emptyState.style.display = totalShown === 0 ? 'block' : 'none';
+  emptyQuery.textContent = query;
+}
+
+function renderChips(){
+  const all = ['All', ...categories];
+  chipsEl.innerHTML = all.map(c =>
+    `<button class="chip ${c === activeCategory ? 'active' : ''}" data-cat="${c}">${c}</button>`
+  ).join('');
+  chipsEl.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      activeCategory = chip.dataset.cat;
+      renderChips();
+      render();
+    });
+  });
+}
+
+searchEl.addEventListener('input', render);
+
+/* ---------- clock ---------- */
+function tick(){
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const date = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  document.getElementById('clock').innerHTML = `<span>${time}</span> · ${date}`;
+}
+tick();
+setInterval(tick, 1000);
+
+/* ---------- SPC status demo dropdown ---------- */
+const statusColors = {
+  tstm: 'var(--status-tstm)', mrgl: 'var(--status-mrgl)', slgt: 'var(--status-slgt)',
+  enh: 'var(--status-enh)', mdt: 'var(--status-mdt)', high: 'var(--status-high)',
+};
+document.getElementById('spc-demo').addEventListener('change', e => {
+  const val = e.target.value;
+  const spcLink = LINKS.find(l => l.name === 'SPC Convective Outlook');
+  spcLink.status = { label: val.toUpperCase(), color: statusColors[val] };
+  render();
+});
+
+renderChips();
+render();
+</script>
+
+</body>
+</html>
