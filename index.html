@@ -74,10 +74,10 @@
   }
 
   h1 .brand-icon{
-    width: 26px; height: 26px;
-    border-radius: 50%;
-    object-fit: cover;
-    box-shadow: 0 0 10px 2px var(--accent-dim);
+    height: 30px;
+    width: auto;
+    object-fit: contain;
+    filter: drop-shadow(0 0 6px var(--accent-dim));
     flex-shrink: 0;
   }
 
@@ -301,7 +301,7 @@
 
 <header>
   <div class="header-row">
-    <h1><img class="brand-icon" src="uga.svg" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 40 40%27><circle cx=%2720%27 cy=%2720%27 r=%2718%27 fill=%27%235ccfe6%27/></svg>'">Met's Bookmarks</h1>
+    <h1><img class="brand-icon" src="logo.svg" alt="" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 40 40%27><circle cx=%2720%27 cy=%2720%27 r=%2718%27 fill=%27%235ccfe6%27/></svg>'">Met's Bookmarks</h1>
     <div id="clock" class="mono"></div>
   </div>
   <div class="search-row">
