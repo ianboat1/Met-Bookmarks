@@ -273,6 +273,7 @@
     color: var(--text);
   }
   .group-link:focus-visible{ outline: 2px solid var(--accent); outline-offset: -2px; }
+  .group-link.group-label{ cursor: default; }
 
   .group-count{
     color: var(--text-faint);
@@ -293,16 +294,37 @@
   .group-toggle:hover{ color: var(--accent); }
   .group-toggle:focus-visible{ outline: 2px solid var(--accent); outline-offset: -2px; }
   .group-toggle svg{ width: 13px; height: 13px; transition: transform .2s ease; }
-  .group-card.expanded .group-toggle svg{ transform: rotate(180deg); }
+  .group-card.expanded > .group-head .group-toggle svg,
+  .child-branch.expanded > .child-branch-head .group-toggle svg{ transform: rotate(180deg); }
+  .group-toggle.small{ padding: 4px 6px; }
+  .group-toggle.small svg{ width: 11px; height: 11px; }
 
   .group-children{
     display: none;
     flex-direction: column;
     gap: 1px;
     border-top: 1px solid var(--border);
-    padding: 6px 14px 8px 50px;
+    padding: 6px 14px 8px 36px;
   }
-  .group-card.expanded .group-children{ display: flex; }
+  .group-card.expanded > .group-children{ display: flex; }
+
+  /* Nested rows — depth increases indentation automatically at any level */
+  .child-row{ padding-left: calc(var(--depth, 1) * 14px); }
+
+  .child-branch-head{
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .child-branch-head .child-link{ flex: 1; }
+
+  .nested-children{
+    display: none;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 2px;
+  }
+  .child-branch.expanded > .nested-children{ display: flex; }
 
   .child-link{
     display: flex;
@@ -318,6 +340,8 @@
   .child-link::before{ content: "–"; color: var(--text-faint); }
   .child-link:hover{ color: var(--text); background: var(--bg-hover); }
   .child-link:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+  .child-link.child-label{ cursor: default; }
+  .child-link.child-label:hover{ color: var(--text-muted); background: none; }
 
   #empty-state{
     display: none;
@@ -438,6 +462,11 @@ const LINKS = [
   { name: "USGS Water Data", url: "https://waterdata.usgs.gov", category: "Hydrology" },
   { name: "NWS River Forecast", url: "https://water.weather.gov", category: "Hydrology" },
 
+  // 3-level nesting example: label-only parent -> station (link) -> live data (link)
+  { id: "nwps", name: "NWPS Hydrographs", category: "Hydrology" }, // no url = organizational label only
+  { id: "wlon7", name: "Cape Fear River at Wilmington (WLON7)", url: "https://water.noaa.gov/gauges/WLON7", category: "Hydrology", parent: "nwps" },
+  { name: "Preliminary Live Data", url: "https://water.noaa.gov/gauges/WLON7?tab=observations", category: "Hydrology", parent: "wlon7" },
+
   // --- Weather & Alerts (bonus category showing the status feature) ---
   { name: "SPC Convective Outlook", url: "https://www.spc.noaa.gov/products/outlook/", category: "Weather & Alerts",
     status: { label: "ENH", color: "var(--status-enh)" } },
@@ -500,6 +529,48 @@ function faviconFor(url){
   } catch { return ''; }
 }
 
+function nodeMatches(item, query){
+  return item.name.toLowerCase().includes(query);
+}
+
+// Does anything anywhere below this item match the query?
+function subtreeHasMatch(item, query){
+  const children = childrenMap[item.id] || [];
+  return children.some(c => nodeMatches(c, query) || subtreeHasMatch(c, query));
+}
+
+const chevronSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+
+// Renders a nested row at any depth (child, grandchild, great-grandchild…).
+// forceShow=true means an ancestor already matched the search, so this
+// whole branch renders in full rather than being filtered further.
+function renderRow(item, depth, query, forceShow){
+  const children = childrenMap[item.id] || [];
+  const selfMatch = forceShow || !query || nodeMatches(item, query);
+  const childRows = children.map(c => renderRow(c, depth + 1, query, selfMatch)).filter(Boolean);
+
+  if (query && !selfMatch && childRows.length === 0) return null;
+
+  const hasChildren = children.length > 0;
+  const isExpanded = expandedGroups.has(item.id) || (!!query && childRows.length > 0);
+  const label = item.url
+    ? `<a class="child-link" href="${item.url}" target="_blank" rel="noopener">${item.name}</a>`
+    : `<span class="child-link child-label">${item.name}</span>`;
+
+  if (!hasChildren){
+    return `<div class="child-row" style="--depth:${depth}">${label}</div>`;
+  }
+
+  return `
+    <div class="child-row child-branch ${isExpanded ? 'expanded' : ''}" style="--depth:${depth}">
+      <div class="child-branch-head">
+        ${label}
+        <button class="group-toggle small" data-group="${item.id}" aria-expanded="${isExpanded}" aria-label="Toggle ${item.name}">${chevronSVG}</button>
+      </div>
+      <div class="nested-children">${childRows.join('')}</div>
+    </div>`;
+}
+
 function cardHTML(link){
   const hasStatus = !!link.status;
   const styleAttr = hasStatus ? `style="--status-color:${link.status.color}"` : '';
@@ -518,30 +589,36 @@ function cardHTML(link){
     </a>`;
 }
 
-function childLinkHTML(child){
-  return `<a class="child-link" href="${child.url}" target="_blank" rel="noopener">${child.name}</a>`;
-}
-
-function groupCardHTML(item, childrenToShow, isExpanded){
-  const fav = faviconFor(item.url);
+// Top-level card for an item that has children. Supports items with no
+// url of their own (pure organizational labels, e.g. "NWPS Hydrographs").
+function groupCardHTML(item, query){
+  const children = childrenMap[item.id] || [];
+  const selfMatch = !query || nodeMatches(item, query);
+  const childRows = children.map(c => renderRow(c, 1, query, selfMatch)).filter(Boolean);
+  const isExpanded = expandedGroups.has(item.id) || (!!query && childRows.length > 0);
   const initial = item.name.trim()[0]?.toUpperCase() || '?';
+  const fav = item.url ? faviconFor(item.url) : '';
+
+  const inner = `
+    <span class="favicon">
+      ${fav ? `<img src="${fav}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+      ${!fav ? initial : ''}
+    </span>
+    <span class="card-text">
+      <div class="card-name">${item.name}<span class="group-count">${children.length}</span></div>
+    </span>`;
+
+  const head = item.url
+    ? `<a class="group-link" href="${item.url}" target="_blank" rel="noopener">${inner}</a>`
+    : `<span class="group-link group-label">${inner}</span>`;
+
   return `
     <div class="card group-card ${isExpanded ? 'expanded' : ''}">
       <div class="group-head">
-        <a class="group-link" href="${item.url}" target="_blank" rel="noopener">
-          <span class="favicon">
-            <img src="${fav}" alt="" loading="lazy" onerror="this.remove()">
-            ${!fav ? initial : ''}
-          </span>
-          <span class="card-text">
-            <div class="card-name">${item.name}<span class="group-count">${childrenToShow.length}</span></div>
-          </span>
-        </a>
-        <button class="group-toggle" data-group="${item.id}" aria-expanded="${isExpanded}" aria-label="Toggle ${item.name} sub-links">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </button>
+        ${head}
+        <button class="group-toggle" data-group="${item.id}" aria-expanded="${isExpanded}" aria-label="Toggle ${item.name} sub-links">${chevronSVG}</button>
       </div>
-      <div class="group-children">${childrenToShow.map(childLinkHTML).join('')}</div>
+      <div class="group-children">${childRows.join('')}</div>
     </div>`;
 }
 
@@ -553,26 +630,22 @@ function render(){
   categories.forEach(cat => {
     if (activeCategory !== 'All' && activeCategory !== cat) return;
 
-    // Top-level items only — children render nested inside their parent's card.
+    // Top-level items only — children/grandchildren render nested inside their parent's card.
     const topLevel = LINKS.filter(l => l.category === cat && !l.parent);
     const htmlParts = [];
 
     topLevel.forEach(item => {
       const children = childrenMap[item.id];
 
-      if (children){
-        const directMatch = !query || item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
-        const matchingChildren = children.filter(c => c.name.toLowerCase().includes(query));
-        if (query && !directMatch && matchingChildren.length === 0) return; // no match anywhere in this group
-
-        const childrenToShow = query && !directMatch ? matchingChildren : children;
-        const forceExpand = query && (matchingChildren.length > 0);
-        const isExpanded = expandedGroups.has(item.id) || forceExpand;
-
-        htmlParts.push(groupCardHTML(item, childrenToShow, isExpanded));
-        totalShown += 1 + childrenToShow.length;
+      if (children && children.length){
+        if (query){
+          const selfMatch = nodeMatches(item, query);
+          if (!selfMatch && !subtreeHasMatch(item, query)) return; // nothing in this whole branch matches
+        }
+        htmlParts.push(groupCardHTML(item, query));
+        totalShown += 1;
       } else {
-        const matches = item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
+        const matches = !query || item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
         if (!matches) return;
         htmlParts.push(cardHTML(item));
         totalShown += 1;
@@ -597,6 +670,7 @@ function render(){
   emptyState.style.display = totalShown === 0 ? 'block' : 'none';
   emptyQuery.textContent = query;
 }
+
 
 main.addEventListener('click', e => {
   const btn = e.target.closest('.group-toggle');
