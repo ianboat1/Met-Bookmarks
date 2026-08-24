@@ -416,7 +416,7 @@
 </header>
 
 <div class="status-note">
-  ⚡ <strong style="color:var(--text)">SPC Convective Outlook</strong> below shows the highest risk category touching any part of <strong style="color:var(--text)">New Hanover County, NC</strong> right now — checked automatically every 15 min.
+  ⚡ <strong style="color:var(--text)">Carolinas SPC Outlooks</strong> and <strong style="color:var(--text)">Georgia SPC Outlooks</strong> below each show the highest risk category touching their tracked counties — checked automatically every 15 min.
   <button id="spc-refresh" type="button">Refresh now</button>
   <span id="spc-updated" class="mono"></span>
 </div>
@@ -467,10 +467,21 @@ const LINKS = [
   { id: "wlon7", name: "Cape Fear River at Wilmington (WLON7)", url: "https://water.noaa.gov/gauges/WLON7", category: "Hydrology", parent: "nwps" },
   { name: "Preliminary Live Data", url: "https://water.noaa.gov/gauges/WLON7?tab=observations", category: "Hydrology", parent: "wlon7" },
 
-  // --- Weather & Alerts (bonus category showing the status feature) ---
-  { name: "SPC Convective Outlook", url: "https://www.spc.noaa.gov/products/outlook/", category: "Weather & Alerts",
-    status: { label: "…", color: "var(--status-none)" } },
+  // --- Weather & Alerts ---
   { name: "NWS Local Forecast", url: "https://forecast.weather.gov", category: "Weather & Alerts" },
+
+  // --- Maps & Analysis ---
+  // SPC as a parent with its own link chain underneath — add/replace children as you like.
+  { id: "spc", name: "Storm Prediction Center (SPC)", url: "https://www.spc.noaa.gov", category: "Maps & Analysis" },
+  { name: "Mesoscale Discussions", url: "https://www.spc.noaa.gov/products/md/", category: "Maps & Analysis", parent: "spc" },
+  { name: "Storm Reports", url: "https://www.spc.noaa.gov/climo/reports/today.html", category: "Maps & Analysis", parent: "spc" },
+
+  // Live-outlook links — each has an id so the LIVE_OUTLOOK_TARGETS block
+  // below can find it and fill in its status automatically.
+  { id: "carolinas-outlook", name: "Carolinas SPC Outlooks", url: "https://www.spc.noaa.gov/partners/outlooks/requests/NCSC/", category: "Maps & Analysis",
+    status: { label: "…", color: "var(--status-none)" } },
+  { id: "georgia-outlook", name: "Georgia SPC Outlooks", url: "https://www.spc.noaa.gov/partners/outlooks/state/GA/", category: "Maps & Analysis",
+    status: { label: "…", color: "var(--status-none)" } },
 
   // --- Sunrise & Sunset Tables ---
   { name: "TimeAndDate Sun Table", url: "https://www.timeanddate.com/sun/", category: "Sunrise & Sunset Tables" },
@@ -728,20 +739,31 @@ function tick(){
 tick();
 setInterval(tick, 1000);
 
-/* ---------- Live SPC Convective Outlook for New Hanover County, NC ----------
-   New Hanover County's actual boundary (US Census TIGER data, 15 vertices —
-   small/simple enough to embed directly, no external county-shape fetch needed). */
-const NHC_COUNTY_RING = [
+/* ---------- Live SPC Convective Outlooks (multi-region) ----------
+   Each county's boundary is real US Census TIGER data, small/simple
+   enough to embed directly — no external county-shape fetch needed. */
+const NHC_RING = [
   [-77.937313, 33.928645], [-77.951643, 34.232368], [-78.029922, 34.331768],
   [-77.822995, 34.389359], [-77.715916, 34.292719], [-77.740136, 34.272546],
   [-77.764022, 34.245641], [-77.829209, 34.162618], [-77.841785, 34.140747],
   [-77.870327, 34.079221], [-77.874384, 34.075671], [-77.878161, 34.067963],
   [-77.915536, 33.971723], [-77.927926, 33.945265], [-77.937313, 33.928645]
 ];
+const CLARKE_RING = [[-83.360028, 34.040572], [-83.258413, 33.999098], [-83.24086, 33.90443], [-83.275933, 33.847977], [-83.537385, 33.965912], [-83.360028, 34.040572]];
+const COBB_RING = [[-84.724435, 33.881859], [-84.737836, 34.079399], [-84.729235, 34.079199], [-84.722636, 34.079199], [-84.721936, 34.079099], [-84.687222, 34.0785], [-84.684745, 34.0785], [-84.682835, 34.078399], [-84.676415, 34.078298], [-84.674935, 34.078199], [-84.673935, 34.078299], [-84.672635, 34.078199], [-84.659234, 34.077999], [-84.521992, 34.075399], [-84.418927, 34.073298], [-84.383027, 33.9638], [-84.442708, 33.901543], [-84.480134, 33.817319], [-84.578132, 33.743507], [-84.619892, 33.805024], [-84.724139, 33.80617], [-84.723969, 33.815306], [-84.725181, 33.816995], [-84.725035, 33.819905], [-84.724435, 33.881859]];
+const RICHMOND_RING = [[-82.028238, 33.544934], [-82.014293, 33.530313], [-82.007638, 33.523335], [-82.007138, 33.522835], [-81.967037, 33.480636], [-81.957934, 33.468632], [-81.912572, 33.408811], [-81.902737, 33.331242], [-81.852136, 33.247544], [-81.851975, 33.247408], [-82.088162, 33.230245], [-82.17424, 33.296771], [-82.26758, 33.267397], [-82.278539, 33.269174], [-82.286507, 33.274135], [-82.296855, 33.277349], [-82.311539, 33.297146], [-82.353498, 33.312318], [-82.350299, 33.314801], [-82.294179, 33.354635], [-82.028238, 33.544934]];
+
+// Which LINKS entry (by id) shows the live status for which county/counties.
+// A target with multiple rings shows the HIGHEST category found across all of them —
+// e.g. Georgia checks Clarke + Cobb + Richmond and surfaces whichever is worst.
+const LIVE_OUTLOOK_TARGETS = [
+  { linkId: 'carolinas-outlook', rings: [NHC_RING] },
+  { linkId: 'georgia-outlook', rings: [CLARKE_RING, COBB_RING, RICHMOND_RING] },
+];
 
 // SPC's "dn" field ranks severity — higher number = higher risk.
-// We ask NOAA's own map service which polygons intersect the county
-// (server does the geometry math), then take the highest dn returned.
+// We ask NOAA's own map service which polygons intersect the given county
+// shape(s) (server does the geometry math), then take the highest dn returned.
 const SPC_CATEGORY_MAP = {
   2: { label: 'TSTM', color: 'var(--status-tstm)' },
   3: { label: 'MRGL', color: 'var(--status-mrgl)' },
@@ -751,12 +773,12 @@ const SPC_CATEGORY_MAP = {
   8: { label: 'HIGH', color: 'var(--status-high)' },
 };
 
-async function fetchSpcOutlookForCounty(){
+async function fetchSpcOutlookForRings(rings){
   const params = new URLSearchParams({
     f: 'geojson',
     where: '1=1',
     outFields: 'dn,label,label2,valid,expire,issue',
-    geometry: JSON.stringify({ rings: [NHC_COUNTY_RING] }),
+    geometry: JSON.stringify({ rings }),
     geometryType: 'esriGeometryPolygon',
     spatialRel: 'esriSpatialRelIntersects',
     inSR: '4326',
@@ -770,39 +792,39 @@ async function fetchSpcOutlookForCounty(){
   return data.features || [];
 }
 
-async function updateSpcStatus(){
-  const spcLink = LINKS.find(l => l.name === 'SPC Convective Outlook');
+async function updateOneOutlookTarget(target){
+  const link = LINKS.find(l => l.id === target.linkId);
+  if (!link) return;
+  try {
+    const features = await fetchSpcOutlookForRings(target.rings);
+    if (features.length === 0){
+      link.status = { label: 'NONE', color: 'var(--status-none)' };
+    } else {
+      const top = features.reduce((max, f) => (f.properties.dn > max.properties.dn ? f : max));
+      const info = SPC_CATEGORY_MAP[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
+      link.status = { label: info.label, color: info.color };
+    }
+  } catch (err){
+    link.status = { label: 'N/A', color: 'var(--text-faint)' };
+    console.error(`SPC outlook fetch failed for ${target.linkId}:`, err);
+  }
+}
+
+async function updateLiveOutlooks(){
   const refreshBtn = document.getElementById('spc-refresh');
   const updatedEl = document.getElementById('spc-updated');
-  if (!spcLink) return;
-
   if (refreshBtn) refreshBtn.disabled = true;
 
-  try {
-    const features = await fetchSpcOutlookForCounty();
-    if (features.length === 0){
-      spcLink.status = { label: 'NONE', color: 'var(--status-none)' };
-    } else {
-      const top = features.reduce((max, f) =>
-        (f.properties.dn > max.properties.dn ? f : max)
-      );
-      const info = SPC_CATEGORY_MAP[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
-      spcLink.status = { label: info.label, color: info.color };
-    }
-    if (updatedEl) updatedEl.textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  } catch (err){
-    spcLink.status = { label: 'N/A', color: 'var(--text-faint)' };
-    if (updatedEl) updatedEl.textContent = 'fetch failed — see console';
-    console.error('SPC outlook fetch failed:', err);
-  }
+  await Promise.all(LIVE_OUTLOOK_TARGETS.map(updateOneOutlookTarget));
 
+  if (updatedEl) updatedEl.textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   if (refreshBtn) refreshBtn.disabled = false;
   render();
 }
 
-document.getElementById('spc-refresh').addEventListener('click', updateSpcStatus);
-updateSpcStatus();
-setInterval(updateSpcStatus, 15 * 60 * 1000); // re-check every 15 minutes
+document.getElementById('spc-refresh').addEventListener('click', updateLiveOutlooks);
+updateLiveOutlooks();
+setInterval(updateLiveOutlooks, 15 * 60 * 1000); // re-check every 15 minutes
 
 renderChips();
 render();
