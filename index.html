@@ -28,6 +28,7 @@
     --status-enh:  #e8973f;
     --status-mdt:  #d1503a;
     --status-high: #c25bc2;
+    --status-none: #5a6274;
   }
 
   *{ box-sizing: border-box; }
@@ -352,8 +353,8 @@
     padding: 60px 0;
   }
 
-  /* ---------- Status demo control ---------- */
-  .status-demo{
+  /* ---------- Live status note ---------- */
+  .status-note{
     max-width: 1200px;
     margin: 0 auto 30px;
     background: var(--bg-elevated);
@@ -368,15 +369,20 @@
     flex-wrap: wrap;
   }
 
-  .status-demo select{
+  .status-note button{
     background: var(--bg);
-    color: var(--text);
+    color: var(--accent);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 5px 10px;
     font-family: Georgia, 'Times New Roman', serif;
     font-size: 12px;
+    cursor: pointer;
+    transition: border-color .15s ease;
   }
+  .status-note button:hover{ border-color: var(--accent); }
+  .status-note button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+  .status-note button:disabled{ opacity: .5; cursor: default; }
 
   @media (prefers-reduced-motion: reduce){
     html{ scroll-behavior: auto; }
@@ -409,16 +415,10 @@
   <div id="chips" class="chips"></div>
 </header>
 
-<div class="status-demo">
-  ⚡ <strong style="color:var(--text)">Status-coding demo</strong> — the SPC Convective Outlook card below changes color with this dropdown, previewing how "live" cards can look. Try it:
-  <select id="spc-demo">
-    <option value="tstm">TSTM (general t-storm)</option>
-    <option value="mrgl">MRGL</option>
-    <option value="slgt">SLGT</option>
-    <option value="enh" selected>ENH</option>
-    <option value="mdt">MDT</option>
-    <option value="high">HIGH</option>
-  </select>
+<div class="status-note">
+  ⚡ <strong style="color:var(--text)">SPC Convective Outlook</strong> below shows the highest risk category touching any part of <strong style="color:var(--text)">New Hanover County, NC</strong> right now — checked automatically every 15 min.
+  <button id="spc-refresh" type="button">Refresh now</button>
+  <span id="spc-updated" class="mono"></span>
 </div>
 
 <main id="main"></main>
@@ -469,7 +469,7 @@ const LINKS = [
 
   // --- Weather & Alerts (bonus category showing the status feature) ---
   { name: "SPC Convective Outlook", url: "https://www.spc.noaa.gov/products/outlook/", category: "Weather & Alerts",
-    status: { label: "ENH", color: "var(--status-enh)" } },
+    status: { label: "…", color: "var(--status-none)" } },
   { name: "NWS Local Forecast", url: "https://forecast.weather.gov", category: "Weather & Alerts" },
 
   // --- Sunrise & Sunset Tables ---
@@ -728,17 +728,81 @@ function tick(){
 tick();
 setInterval(tick, 1000);
 
-/* ---------- SPC status demo dropdown ---------- */
-const statusColors = {
-  tstm: 'var(--status-tstm)', mrgl: 'var(--status-mrgl)', slgt: 'var(--status-slgt)',
-  enh: 'var(--status-enh)', mdt: 'var(--status-mdt)', high: 'var(--status-high)',
+/* ---------- Live SPC Convective Outlook for New Hanover County, NC ----------
+   New Hanover County's actual boundary (US Census TIGER data, 15 vertices —
+   small/simple enough to embed directly, no external county-shape fetch needed). */
+const NHC_COUNTY_RING = [
+  [-77.937313, 33.928645], [-77.951643, 34.232368], [-78.029922, 34.331768],
+  [-77.822995, 34.389359], [-77.715916, 34.292719], [-77.740136, 34.272546],
+  [-77.764022, 34.245641], [-77.829209, 34.162618], [-77.841785, 34.140747],
+  [-77.870327, 34.079221], [-77.874384, 34.075671], [-77.878161, 34.067963],
+  [-77.915536, 33.971723], [-77.927926, 33.945265], [-77.937313, 33.928645]
+];
+
+// SPC's "dn" field ranks severity — higher number = higher risk.
+// We ask NOAA's own map service which polygons intersect the county
+// (server does the geometry math), then take the highest dn returned.
+const SPC_CATEGORY_MAP = {
+  2: { label: 'TSTM', color: 'var(--status-tstm)' },
+  3: { label: 'MRGL', color: 'var(--status-mrgl)' },
+  4: { label: 'SLGT', color: 'var(--status-slgt)' },
+  5: { label: 'ENH',  color: 'var(--status-enh)'  },
+  6: { label: 'MDT',  color: 'var(--status-mdt)'  },
+  8: { label: 'HIGH', color: 'var(--status-high)' },
 };
-document.getElementById('spc-demo').addEventListener('change', e => {
-  const val = e.target.value;
+
+async function fetchSpcOutlookForCounty(){
+  const params = new URLSearchParams({
+    f: 'geojson',
+    where: '1=1',
+    outFields: 'dn,label,label2,valid,expire,issue',
+    geometry: JSON.stringify({ rings: [NHC_COUNTY_RING] }),
+    geometryType: 'esriGeometryPolygon',
+    spatialRel: 'esriSpatialRelIntersects',
+    inSR: '4326',
+    outSR: '4326',
+  });
+  const url = `https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query?${params}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`SPC service responded ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || 'SPC service returned an error');
+  return data.features || [];
+}
+
+async function updateSpcStatus(){
   const spcLink = LINKS.find(l => l.name === 'SPC Convective Outlook');
-  spcLink.status = { label: val.toUpperCase(), color: statusColors[val] };
+  const refreshBtn = document.getElementById('spc-refresh');
+  const updatedEl = document.getElementById('spc-updated');
+  if (!spcLink) return;
+
+  if (refreshBtn) refreshBtn.disabled = true;
+
+  try {
+    const features = await fetchSpcOutlookForCounty();
+    if (features.length === 0){
+      spcLink.status = { label: 'NONE', color: 'var(--status-none)' };
+    } else {
+      const top = features.reduce((max, f) =>
+        (f.properties.dn > max.properties.dn ? f : max)
+      );
+      const info = SPC_CATEGORY_MAP[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
+      spcLink.status = { label: info.label, color: info.color };
+    }
+    if (updatedEl) updatedEl.textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (err){
+    spcLink.status = { label: 'N/A', color: 'var(--text-faint)' };
+    if (updatedEl) updatedEl.textContent = 'fetch failed — see console';
+    console.error('SPC outlook fetch failed:', err);
+  }
+
+  if (refreshBtn) refreshBtn.disabled = false;
   render();
-});
+}
+
+document.getElementById('spc-refresh').addEventListener('click', updateSpcStatus);
+updateSpcStatus();
+setInterval(updateSpcStatus, 15 * 60 * 1000); // re-check every 15 minutes
 
 renderChips();
 render();
