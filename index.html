@@ -346,6 +346,45 @@
   .child-link.child-label{ cursor: default; }
   .child-link.child-label:hover{ color: var(--text-muted); background: none; }
 
+  /* ---------- Private links (local-only, never committed) ---------- */
+  .private-badge{
+    margin-left: 6px;
+    font-size: 11px;
+    opacity: .75;
+  }
+
+  .private-card{
+    display: flex;
+    align-items: stretch;
+    padding: 0;
+  }
+
+  /* Configured state: real link + small edit (pencil) button, same treatment as group cards */
+  .private-card .group-link{ padding: 12px 6px 12px 14px; }
+
+  /* Unconfigured state: a full-width button styled to look like a normal card */
+  button.card.private-setup{
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    color: var(--text);
+    cursor: pointer;
+    width: 100%;
+    transition: border-color .15s ease, background .15s ease, transform .1s ease;
+  }
+  button.card.private-setup:hover{
+    background: var(--bg-hover);
+    border-color: var(--border-hover);
+    transform: translateY(-1px);
+  }
+  button.card.private-setup:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
+
   #empty-state{
     display: none;
     text-align: center;
@@ -441,19 +480,28 @@
    parent's spot in the grid and appear in a collapsible list
    under it. Any link can be a parent; nesting is one level deep.
 
+   PRIVATE LINKS (never committed to the file, e.g. a personal Sheet):
+     Give the item `private: true` and NO url. The first time you open the
+     page in a given browser, clicking it asks you to paste the real URL,
+     then remembers it in that browser's localStorage only — it's never
+     written into this HTML file, so it never ends up in your public repo
+     or its commit history. Click the small pencil icon to update or clear
+     it later. Note: this is per-browser, not synced — set it up again on
+     each device/browser you use.
+
    Categories are generated automatically from whatever you
    use below — add a new category name and it just shows up.
    ========================================================= */
 const LINKS = [
   // --- Social Media ---
-  { name: "Facebook", url: "https://www.facebook.com", category: "Social Media" },
+  { name: "Facebook", url: "https://www.facebook.com/", category: "Social Media" },
   { name: "Twitter", url: "https://twitter.com/home", category: "Social Media" },
-  { name: "Bluesky", url: "https://bsky.app", category: "Social Media" },
-  { name: "Instagram", url: "https://instagram.com", category: "Social Media" },
+  { name: "Bluesky", url: "https://bsky.app/", category: "Social Media" },
+  { name: "Instagram", url: "https://www.instagram.com/", category: "Social Media" },
   { name: "GroupMe", url: "https://web.groupme.com/chats", category: "Social Media" },
-  { name: "YouTube", url: "https://youtube.com", category: "Social Media" },
-  { name: "Rivals", url: "https://on3.com/teams/georgia-bulldogs", category: "Social Media" },
-  { id: "reddit", name: "Reddit", url: "https://reddit.com", category: "Social Media" },
+  { name: "YouTube", url: "https://www.youtube.com/", category: "Social Media" },
+  { name: "Rivals", url: "https://www.on3.com/teams/georgia-bulldogs", category: "Social Media" },
+  { id: "reddit", name: "Reddit", url: "https://www.reddit.com/", category: "Social Media" },
   { name: "r/CFB", url: "https://old.reddit.com/r/cfb", category: "Social Media", parent: "reddit" },
   { name: "r/Braves", url: "https://old.reddit.com/r/Braves", category: "Social Media", parent: "reddit" },
   { name: "r/Falcons", url: "https://old.reddit.com/r/falcons", category: "Social Media", parent: "reddit" },
@@ -462,11 +510,10 @@ const LINKS = [
   { name: "r/Wilmington", url: "https://old.reddit.com/r/Wilmington", category: "Social Media", parent: "reddit" },
 
   // --- Marine & Surf ---
-  { name: "Surfchex", url: "https://surfchex.com", category: "Marine & Surf" },
-  { name: "Mercers Pier Buoy (JMPN7)", url: "https://ndbc.noaa.gov/station_page.php?station=jmpn7", category: "Marine & Surf" },
-  { name: "UNCW CORMP", url: "https://cormp.org", category: "Marine & Surf" },
-  { name: "Frying Pan Shoals Buoy 41013", url: "https://ndbc.noaa.gov/station_page.php?station=41013", category: "Marine & Surf" },
-  { name: "UV Index", url: "https://epa.gov/sunsafety/uv-index-applications", category: "Marine & Surf" },
+  { name: "NOAA Tides & Currents", url: "https://tidesandcurrents.noaa.gov", category: "Marine & Surf" },
+  { name: "Surfline", url: "https://surfline.com", category: "Marine & Surf" },
+  { name: "Windy", url: "https://windy.com", category: "Marine & Surf" },
+  { name: "NDBC Buoy Data", url: "https://ndbc.noaa.gov", category: "Marine & Surf" },
 
   // --- Hydrology ---
   { name: "USGS Water Data", url: "https://waterdata.usgs.gov", category: "Hydrology" },
@@ -502,9 +549,15 @@ const LINKS = [
   { name: "Sunrise-Sunset.org", url: "https://sunrise-sunset.org", category: "Sunrise & Sunset Tables" },
 
   // --- Finances ---
-  { name: "Bank Login", url: "https://example-bank.com", category: "Finances" },
-  { name: "Credit Card Portal", url: "https://example-cc.com", category: "Finances" },
-  { name: "Budget Sheet", url: "https://sheets.google.com", category: "Finances" },
+  { name: "South State Bank", url: "https://www.southstatebank.com/", category: "Finances" },
+  { name: "USAA", url: "https://www.usaa.com/my/logon?logoffjump=true&wa_ref=pub_global_log_on", category: "Finances" },
+  { name: "Barclays Bank", url: "https://cards.barclaycardus.com/", category: "Finances" },
+  { name: "Marcus by Goldman Sachs", url: "https://www.marcus.com/us/en/login", category: "Finances" },
+  { id: "budget-sheet", name: "Budget", category: "Finances", private: true }, // entered once per browser, never saved to this file — see PRIVATE LINKS below
+  { id: "experian", name: "Experian", url: "https://usa.experian.com/login/index?br=exp&op=XXXX-LOG-PRI-XXX-LGM-XXXXXXX-XX-EXP-VWIN-SEO-XXXXXX-XXXXXX-XXXXX&_gl=1*o689dm*_gcl_au*MjExMTgxNjE2MC4xNzg3NjQyMzkzLi0uLS4xNzg3NjQyMzkzLjE1MzM4NDM2NzkuMTc4NzY0MjM5NC4xNzg3NjQyMzkz*_ga*MTc1MzUwNzI3My4xNzg3NjQyMzkz*_ga_22YNWJN8Z2*czE3ODc2NDIzOTMkbzEkZzEkdDE3ODc2NDIzOTUkajU4JGwwJGgw*_ga_7EN8BHB8L8*czE3ODc2NDIzOTMkbzEkZzEkdDE3ODc2NDIzOTYkajU3JGwwJGgw", category: "Finances" },
+  { name: "Freeze/Thaw Experian Credit", url: "https://usa.experian.com/login/index?br=exp&it=frz&op=XXXX-FRZ-PRI-XXX-LGM-XXXXXXX-XX-EXP-VWIN-SEO-XXXXXX-XXXXXX-XXXXX&_gl=1*sm4fxd*_gcl_au*MjExMTgxNjE2MC4xNzg3NjQyMzkzLi0uLS4xNzg3NjQyMzkzLjE1MzM4NDM2NzkuMTc4NzY0MjM5NC4xNzg3NjQyMzkz*_ga*MTc1MzUwNzI3My4xNzg3NjQyMzkz*_ga_22YNWJN8Z2*czE3ODc2NDIzOTMkbzEkZzEkdDE3ODc2NDI0MjAkajMzJGwwJGgw*_ga_7EN8BHB8L8*czE3ODc2NDIzOTMkbzEkZzEkdDE3ODc2NDI0MjEkajMyJGwwJGgw", category: "Finances", parent: "experian" },
+  { name: "Equifax", url: "https://my.equifax.com/membercenter/#/login", category: "Finances" },
+  { name: "TransUnion", url: "https://service.transunion.com/dss/dashboard.page?", category: "Finances" },
 
   // --- Utilities ---
   { name: "Electric Company", url: "https://example-electric.com", category: "Utilities" },
@@ -552,6 +605,42 @@ function faviconFor(url){
     const u = new URL(url);
     return `https://www.google.com/s2/favicons?sz=64&domain_url=${encodeURIComponent(u.origin)}`;
   } catch { return ''; }
+}
+
+/* ---------- Private links: stored in this browser only, never in the file itself ---------- */
+const pencilSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
+
+function privateLinkKey(id){ return `privateLink:${id}`; }
+function getPrivateUrl(id){ return localStorage.getItem(privateLinkKey(id)); }
+
+function privateCardHTML(item){
+  const stored = getPrivateUrl(item.id);
+  const initial = item.name.trim()[0]?.toUpperCase() || '?';
+  const badge = `<span class="private-badge" title="Stored only in this browser, never in the file">🔒</span>`;
+
+  if (!stored){
+    return `
+      <button class="card private-setup" data-private-setup="${item.id}" type="button">
+        <span class="favicon">${initial}</span>
+        <span class="card-text">
+          <div class="card-name">${item.name}${badge}</div>
+          <div class="card-status" style="--status-color:var(--text-faint)">click to set up</div>
+        </span>
+      </button>`;
+  }
+
+  const fav = faviconFor(stored);
+  return `
+    <div class="card private-card">
+      <a class="group-link" href="${stored}" target="_blank" rel="noopener">
+        <span class="favicon">
+          ${fav ? `<img src="${fav}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+          ${!fav ? initial : ''}
+        </span>
+        <span class="card-text"><div class="card-name">${item.name}${badge}</div></span>
+      </a>
+      <button class="group-toggle small" data-private-edit="${item.id}" aria-label="Update ${item.name} link" title="Update stored link">${pencilSVG}</button>
+    </div>`;
 }
 
 function nodeMatches(item, query){
@@ -683,7 +772,7 @@ function render(){
       } else {
         const matches = !query || item.name.toLowerCase().includes(query) || item.category.toLowerCase().includes(query);
         if (!matches) return;
-        htmlParts.push(cardHTML(item));
+        htmlParts.push(item.private ? privateCardHTML(item) : cardHTML(item));
         totalShown += 1;
       }
     });
@@ -709,9 +798,36 @@ function render(){
 
 
 main.addEventListener('click', e => {
-  const btn = e.target.closest('.group-toggle');
-  if (!btn) return;
-  const id = btn.dataset.group;
+  const editBtn = e.target.closest('[data-private-edit]');
+  if (editBtn){
+    const id = editBtn.dataset.privateEdit;
+    const item = LINKS.find(l => l.id === id);
+    const current = getPrivateUrl(id) || '';
+    const entered = prompt(`Update the URL for "${item.name}".\nStored only in this browser — never saved to the file.\n\nLeave blank and confirm to remove it.`, current);
+    if (entered !== null){
+      const trimmed = entered.trim();
+      if (trimmed) localStorage.setItem(privateLinkKey(id), trimmed);
+      else localStorage.removeItem(privateLinkKey(id));
+      render();
+    }
+    return;
+  }
+
+  const setupBtn = e.target.closest('[data-private-setup]');
+  if (setupBtn){
+    const id = setupBtn.dataset.privateSetup;
+    const item = LINKS.find(l => l.id === id);
+    const entered = prompt(`Paste the URL for "${item.name}".\nStored only in this browser (localStorage) — never saved to the file or committed to your repo.`);
+    if (entered && entered.trim()){
+      localStorage.setItem(privateLinkKey(id), entered.trim());
+      render();
+    }
+    return;
+  }
+
+  const toggleBtn = e.target.closest('.group-toggle');
+  if (!toggleBtn) return;
+  const id = toggleBtn.dataset.group;
   if (expandedGroups.has(id)) expandedGroups.delete(id); else expandedGroups.add(id);
   render();
 });
