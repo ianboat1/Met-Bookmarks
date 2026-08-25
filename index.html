@@ -479,9 +479,13 @@ const LINKS = [
   // Live-outlook links — each has an id so the LIVE_OUTLOOK_TARGETS block
   // below can find it and fill in its status automatically.
   { id: "carolinas-outlook", name: "Carolinas SPC Outlooks", url: "https://www.spc.noaa.gov/partners/outlooks/requests/NCSC/", category: "Maps & Analysis",
-    status: { label: "…", color: "var(--status-none)" } },
+    status: [{ name: "New Hanover County, NC", label: "…", color: "var(--status-none)", dn: -1 }] },
   { id: "georgia-outlook", name: "Georgia SPC Outlooks", url: "https://www.spc.noaa.gov/partners/outlooks/state/GA/", category: "Maps & Analysis",
-    status: { label: "…", color: "var(--status-none)" } },
+    status: [
+      { name: "Clarke County", label: "…", color: "var(--status-none)", dn: -1 },
+      { name: "Cobb County", label: "…", color: "var(--status-none)", dn: -1 },
+      { name: "Richmond County", label: "…", color: "var(--status-none)", dn: -1 },
+    ] },
 
   // --- Sunrise & Sunset Tables ---
   { name: "TimeAndDate Sun Table", url: "https://www.timeanddate.com/sun/", category: "Sunrise & Sunset Tables" },
@@ -582,11 +586,22 @@ function renderRow(item, depth, query, forceShow){
     </div>`;
 }
 
+function worstStatusEntry(entries){
+  return entries.reduce((max, e) => (e.dn > max.dn ? e : max));
+}
+
 function cardHTML(link){
-  const hasStatus = !!link.status;
-  const styleAttr = hasStatus ? `style="--status-color:${link.status.color}"` : '';
+  const entries = link.status ? (Array.isArray(link.status) ? link.status : [link.status]) : null;
+  const hasStatus = !!entries && entries.length > 0;
+  const styleAttr = hasStatus ? `style="--status-color:${worstStatusEntry(entries).color}"` : '';
   const initial = link.name.trim()[0]?.toUpperCase() || '?';
   const fav = faviconFor(link.url);
+  const statusHTML = hasStatus
+    ? entries.map(e => `
+        <div class="card-status" style="--status-color:${e.color}">
+          <span class="status-dot"></span>${entries.length > 1 ? `${e.name}: ` : ''}${e.label}
+        </div>`).join('')
+    : '';
   return `
     <a class="card ${hasStatus ? 'has-status' : ''}" ${styleAttr} href="${link.url}" target="_blank" rel="noopener">
       <span class="favicon">
@@ -595,7 +610,7 @@ function cardHTML(link){
       </span>
       <span class="card-text">
         <div class="card-name">${link.name}</div>
-        ${hasStatus ? `<div class="card-status"><span class="status-dot"></span>${link.status.label}</div>` : ''}
+        ${statusHTML}
       </span>
     </a>`;
 }
@@ -753,17 +768,21 @@ const CLARKE_RING = [[-83.360028, 34.040572], [-83.258413, 33.999098], [-83.2408
 const COBB_RING = [[-84.724435, 33.881859], [-84.737836, 34.079399], [-84.729235, 34.079199], [-84.722636, 34.079199], [-84.721936, 34.079099], [-84.687222, 34.0785], [-84.684745, 34.0785], [-84.682835, 34.078399], [-84.676415, 34.078298], [-84.674935, 34.078199], [-84.673935, 34.078299], [-84.672635, 34.078199], [-84.659234, 34.077999], [-84.521992, 34.075399], [-84.418927, 34.073298], [-84.383027, 33.9638], [-84.442708, 33.901543], [-84.480134, 33.817319], [-84.578132, 33.743507], [-84.619892, 33.805024], [-84.724139, 33.80617], [-84.723969, 33.815306], [-84.725181, 33.816995], [-84.725035, 33.819905], [-84.724435, 33.881859]];
 const RICHMOND_RING = [[-82.028238, 33.544934], [-82.014293, 33.530313], [-82.007638, 33.523335], [-82.007138, 33.522835], [-81.967037, 33.480636], [-81.957934, 33.468632], [-81.912572, 33.408811], [-81.902737, 33.331242], [-81.852136, 33.247544], [-81.851975, 33.247408], [-82.088162, 33.230245], [-82.17424, 33.296771], [-82.26758, 33.267397], [-82.278539, 33.269174], [-82.286507, 33.274135], [-82.296855, 33.277349], [-82.311539, 33.297146], [-82.353498, 33.312318], [-82.350299, 33.314801], [-82.294179, 33.354635], [-82.028238, 33.544934]];
 
-// Which LINKS entry (by id) shows the live status for which county/counties.
-// A target with multiple rings shows the HIGHEST category found across all of them —
-// e.g. Georgia checks Clarke + Cobb + Richmond and surfaces whichever is worst.
+// Which LINKS entry (by id) shows the live status for which named county/counties.
+// Each region is fetched separately so its status can be shown on its own line —
+// e.g. Georgia shows Clarke, Cobb, and Richmond each individually.
 const LIVE_OUTLOOK_TARGETS = [
-  { linkId: 'carolinas-outlook', rings: [NHC_RING] },
-  { linkId: 'georgia-outlook', rings: [CLARKE_RING, COBB_RING, RICHMOND_RING] },
+  { linkId: 'carolinas-outlook', regions: [{ name: 'New Hanover County, NC', ring: NHC_RING }] },
+  { linkId: 'georgia-outlook', regions: [
+      { name: 'Clarke County', ring: CLARKE_RING },
+      { name: 'Cobb County', ring: COBB_RING },
+      { name: 'Richmond County', ring: RICHMOND_RING },
+    ] },
 ];
 
 // SPC's "dn" field ranks severity — higher number = higher risk.
-// We ask NOAA's own map service which polygons intersect the given county
-// shape(s) (server does the geometry math), then take the highest dn returned.
+// We ask NOAA's own map service which polygons intersect a given county
+// shape (server does the geometry math), then take the highest dn returned.
 const SPC_CATEGORY_MAP = {
   2: { label: 'TSTM', color: 'var(--status-tstm)' },
   3: { label: 'MRGL', color: 'var(--status-mrgl)' },
@@ -792,22 +811,25 @@ async function fetchSpcOutlookForRings(rings){
   return data.features || [];
 }
 
+async function fetchStatusForRegion(region){
+  try {
+    const features = await fetchSpcOutlookForRings([region.ring]);
+    if (features.length === 0){
+      return { name: region.name, label: 'NONE', color: 'var(--status-none)', dn: -1 };
+    }
+    const top = features.reduce((max, f) => (f.properties.dn > max.properties.dn ? f : max));
+    const info = SPC_CATEGORY_MAP[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
+    return { name: region.name, label: info.label, color: info.color, dn: top.properties.dn };
+  } catch (err){
+    console.error(`SPC outlook fetch failed for ${region.name}:`, err);
+    return { name: region.name, label: 'N/A', color: 'var(--text-faint)', dn: -2 };
+  }
+}
+
 async function updateOneOutlookTarget(target){
   const link = LINKS.find(l => l.id === target.linkId);
   if (!link) return;
-  try {
-    const features = await fetchSpcOutlookForRings(target.rings);
-    if (features.length === 0){
-      link.status = { label: 'NONE', color: 'var(--status-none)' };
-    } else {
-      const top = features.reduce((max, f) => (f.properties.dn > max.properties.dn ? f : max));
-      const info = SPC_CATEGORY_MAP[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
-      link.status = { label: info.label, color: info.color };
-    }
-  } catch (err){
-    link.status = { label: 'N/A', color: 'var(--text-faint)' };
-    console.error(`SPC outlook fetch failed for ${target.linkId}:`, err);
-  }
+  link.status = await Promise.all(target.regions.map(fetchStatusForRegion));
 }
 
 async function updateLiveOutlooks(){
