@@ -104,6 +104,17 @@
     max-width: 480px;
   }
 
+  .tide-day-label{
+    color: var(--text-faint);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: right;
+    margin-top: 6px;
+    margin-bottom: 3px;
+  }
+  .tide-day-label:first-child{ margin-top: 0; }
+
   .tide-pills{
     display: flex;
     flex-wrap: wrap;
@@ -501,6 +512,7 @@
     #sun-times{ text-align: left; }
     #tide-times{ max-width: none; }
     .tide-pills{ justify-content: flex-start; }
+    .tide-day-label{ text-align: left; }
     .tide-caption{ text-align: left; }
     #tide-chart{ max-width: none; margin-left: 0; }
     .grid{ grid-template-columns: 1fr 1fr; }
@@ -1016,19 +1028,39 @@ async function updateSunTimes(){
 updateSunTimes();
 setInterval(updateSunTimes, 30 * 60 * 1000); // this product updates twice daily, no need to poll often
 
-/* ---------- Today's Tides — Johnnie Mercers Fishing Pier, Wrightsville Beach, NC (station 8658163) ----------
+/* ---------- Today + Tomorrow's Tides — Johnnie Mercers Fishing Pier, Wrightsville Beach, NC (station 8658163) ----------
    Unlike the sunrise/sunset page, tide predictions have a real public JSON API
    (NOAA's CO-OPS data service), built for exactly this kind of use — no HTML
    scraping needed here. */
-async function fetchTodayTides(){
+
+// Eastern-timezone today/tomorrow as YYYYMMDD strings for the API's begin/end_date params.
+function easternTodayParts(){
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date());
+  return { y: parseInt(part(parts, 'year'), 10), m: parseInt(part(parts, 'month'), 10), d: parseInt(part(parts, 'day'), 10) };
+}
+function addOneDay({ y, m, d }){
+  const dt = new Date(Date.UTC(y, m - 1, d, 12)); // noon UTC anchor sidesteps DST edge cases
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+function ymdToApiDate({ y, m, d }){
+  return `${y}${String(m).padStart(2, '0')}${String(d).padStart(2, '0')}`;
+}
+
+async function fetchTideRange(interval){
+  const todayParts = easternTodayParts();
+  const tomorrowParts = addOneDay(todayParts);
   const params = new URLSearchParams({
-    date: 'today',
+    begin_date: ymdToApiDate(todayParts),
+    end_date: ymdToApiDate(tomorrowParts),
     station: '8658163',
     product: 'predictions',
     datum: 'MLLW',
     time_zone: 'lst_ldt',
     units: 'english',
-    interval: 'hilo',
+    interval,
     application: 'personal_bookmarks_dashboard',
     format: 'json',
   });
@@ -1037,8 +1069,11 @@ async function fetchTodayTides(){
   if (!res.ok) throw new Error(`Tides API responded ${res.status}`);
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || 'Tides API returned an error');
-  return data.predictions || [];
+  return { predictions: data.predictions || [], startDate: todayParts };
 }
+
+const fetchTodayTides = () => fetchTideRange('hilo');
+const fetchTideCurve = () => fetchTideRange('6');
 
 function formatTideTime(t){
   // t looks like "2026-08-25 03:12"
@@ -1049,31 +1084,14 @@ function formatTideTime(t){
   return `${hour}:${mStr} ${ampm}`;
 }
 
-function minutesFromTideTimestamp(t){
-  const [hStr, mStr] = t.split(' ')[1].split(':');
-  return parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
-}
-
-// Fine-resolution predictions (6-min steps) for drawing the actual curve —
-// same API as the pills, just without interval=hilo.
-async function fetchTideCurve(){
-  const params = new URLSearchParams({
-    date: 'today',
-    station: '8658163',
-    product: 'predictions',
-    datum: 'MLLW',
-    time_zone: 'lst_ldt',
-    units: 'english',
-    interval: '6',
-    application: 'personal_bookmarks_dashboard',
-    format: 'json',
-  });
-  const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Tides API responded ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message || 'Tides API returned an error');
-  return (data.predictions || []).map(p => ({ minutes: minutesFromTideTimestamp(p.t), v: parseFloat(p.v) }));
+// Minutes since the *start* of the chart's first day (0–1439 = today, 1440–2879 = tomorrow),
+// computed from the full "YYYY-MM-DD HH:MM" timestamp so today/tomorrow don't collide.
+function minutesSinceStart(t, startParts){
+  const [datePart, timePart] = t.split(' ');
+  const [y, m, d] = datePart.split('-').map(Number);
+  const [hh, mm] = timePart.split(':').map(Number);
+  const dayOffset = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(startParts.y, startParts.m - 1, startParts.d)) / 86400000);
+  return dayOffset * 1440 + hh * 60 + mm;
 }
 
 function easternMinutesOfDay(date){
@@ -1095,8 +1113,9 @@ function interpolateTideValue(curve, minutes){
 
 let activeTideChart = null; // holds scale functions + curve so the "now" marker can move without refetching
 
-function renderTideChart(el, curve, hiLo){
-  const W = 440, H = 110, padTop = 22, padBottom = 22, padX = 6;
+function renderTideChart(el, curve, hiLo, startParts){
+  const SPAN_MINUTES = 2880; // 48 hours
+  const W = 760, H = 110, padTop = 22, padBottom = 22, padX = 6;
   const plotH = H - padTop - padBottom;
   const baseline = padTop + plotH;
   const values = curve.map(p => p.v);
@@ -1104,14 +1123,14 @@ function renderTideChart(el, curve, hiLo){
   const maxV = Math.max(...values);
   const spanV = (maxV - minV) || 1;
 
-  const xScale = m => padX + (m / 1440) * (W - 2 * padX);
+  const xScale = m => padX + (m / SPAN_MINUTES) * (W - 2 * padX);
   const yScale = v => padTop + (1 - (v - minV) / spanV) * plotH;
 
   const lineD = 'M' + curve.map(p => `${xScale(p.minutes).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(' L');
   const areaD = `${lineD} L${xScale(curve[curve.length - 1].minutes).toFixed(1)},${baseline} L${xScale(curve[0].minutes).toFixed(1)},${baseline} Z`;
 
   const markersHTML = hiLo.map(p => {
-    const minutes = minutesFromTideTimestamp(p.t);
+    const minutes = minutesSinceStart(p.t, startParts);
     const v = parseFloat(p.v);
     const x = xScale(minutes);
     const y = yScale(v);
@@ -1122,6 +1141,16 @@ function renderTideChart(el, curve, hiLo){
       <text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" class="tide-chart-label">${formatTideTime(p.t)}</text>
     `;
   }).join('');
+
+  // Divider marking the today/tomorrow boundary, with tomorrow's date labeled.
+  const tomorrowParts = addOneDay(startParts);
+  const boundaryX = xScale(1440);
+  const boundaryLabel = new Date(Date.UTC(tomorrowParts.y, tomorrowParts.m - 1, tomorrowParts.d))
+    .toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
+  const dividerHTML = `
+    <line x1="${boundaryX.toFixed(1)}" y1="${padTop}" x2="${boundaryX.toFixed(1)}" y2="${baseline}" stroke="var(--border-hover)" stroke-width="1" stroke-dasharray="3,3" />
+    <text x="${boundaryX.toFixed(1)}" y="${H - 5}" text-anchor="middle" class="tide-chart-label">${boundaryLabel}</text>
+  `;
 
   const nowMinutes = easternMinutesOfDay(new Date());
   const nowX = xScale(nowMinutes);
@@ -1137,6 +1166,7 @@ function renderTideChart(el, curve, hiLo){
       </defs>
       <path d="${areaD}" fill="url(#tideFill)" stroke="none" />
       <path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+      ${dividerHTML}
       ${markersHTML}
       <line id="tide-now-line" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
       <circle id="tide-now-dot" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
@@ -1158,32 +1188,44 @@ function moveTideNowMarker(){
   if (dot){ dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); }
 }
 
+function tidePillsHTML(events){
+  return events.map(p => {
+    const isHigh = p.type === 'H';
+    const icon = isHigh ? '▲' : '▼';
+    const time = formatTideTime(p.t);
+    const height = parseFloat(p.v).toFixed(2);
+    return `<span class="tide-pill ${isHigh ? 'high' : 'low'}"><span class="tide-icon">${icon}</span>${time} · ${height} ft MLLW</span>`;
+  }).join('');
+}
+
 async function updateTideDisplay(){
   const pillsEl = document.getElementById('tide-times');
   const chartEl = document.getElementById('tide-chart');
   try {
-    const [hiLo, curve] = await Promise.all([fetchTodayTides(), fetchTideCurve()]);
+    const [hiLoResult, curveResult] = await Promise.all([fetchTodayTides(), fetchTideCurve()]);
+    const { predictions: hiLo, startDate } = hiLoResult;
+    const curve = curveResult.predictions.map(p => ({ minutes: minutesSinceStart(p.t, startDate), v: parseFloat(p.v) }));
 
     if (pillsEl){
       if (hiLo.length === 0){
         pillsEl.textContent = '';
       } else {
-        const pills = hiLo.map(p => {
-          const isHigh = p.type === 'H';
-          const icon = isHigh ? '▲' : '▼';
-          const time = formatTideTime(p.t);
-          const height = parseFloat(p.v).toFixed(2);
-          return `<span class="tide-pill ${isHigh ? 'high' : 'low'}"><span class="tide-icon">${icon}</span>${time} · ${height} ft MLLW</span>`;
-        });
+        const todayEvents = hiLo.filter(p => minutesSinceStart(p.t, startDate) < 1440);
+        const tomorrowEvents = hiLo.filter(p => minutesSinceStart(p.t, startDate) >= 1440);
         pillsEl.innerHTML = `
-          <div class="tide-pills">${pills.join('')}</div>
+          <div class="tide-day-label">Today</div>
+          <div class="tide-pills">${tidePillsHTML(todayEvents)}</div>
+          ${tomorrowEvents.length ? `
+            <div class="tide-day-label">Tomorrow</div>
+            <div class="tide-pills">${tidePillsHTML(tomorrowEvents)}</div>
+          ` : ''}
           <div class="tide-caption">Johnnie Mercers Fishing Pier, Wrightsville Beach, NC</div>
         `;
       }
     }
 
     if (chartEl && curve.length > 0){
-      renderTideChart(chartEl, curve, hiLo);
+      renderTideChart(chartEl, curve, hiLo, startDate);
     }
   } catch (err){
     if (pillsEl) pillsEl.textContent = '';
@@ -1192,7 +1234,7 @@ async function updateTideDisplay(){
   }
 }
 updateTideDisplay();
-setInterval(updateTideDisplay, 60 * 60 * 1000); // today's predictions don't change; hourly just rolls into the next day
+setInterval(updateTideDisplay, 60 * 60 * 1000); // rolls the range forward each hour so "tomorrow" keeps advancing
 setInterval(moveTideNowMarker, 60 * 1000); // reposition the "now" marker every minute without refetching
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
