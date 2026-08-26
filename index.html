@@ -558,8 +558,15 @@ const LINKS = [
     ] },
 
   // --- Sunrise & Sunset Tables ---
-  { name: "TimeAndDate Sun Table", url: "https://www.timeanddate.com/sun/", category: "Sunrise & Sunset Tables" },
-  { name: "Sunrise-Sunset.org", url: "https://sunrise-sunset.org", category: "Sunrise & Sunset Tables" },
+  { name: "Create a Table", url: "https://aa.usno.navy.mil/data/RS_OneYear", category: "Sunrise & Sunset Tables" },
+  { id: "sunset-2026", name: "2026 Tables (Z Time)", category: "Sunrise & Sunset Tables" }, // no url = label only
+  { name: "Wilmington, NC", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=34.2763&lon=-77.9128&label=Wilmington%2C+NC&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
+  { name: "North Myrtle Beach, SC", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=33.8114&lon=-78.7235&label=North+Myrtle+Beach%2C+SC&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
+  { name: "Florence, SC", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=34.1931&lon=-79.7283&label=Florence%2C+SC&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
+  { name: "Lumberton, NC", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=34.6113&lon=-79.0595&label=Lumberton%2C+NC&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
+  { name: "Athens, GA", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=33.9518&lon=-83.3239&label=Athens%2C+GA&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
+  { name: "Kennesaw, GA", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=34.0146&lon=-84.6003&label=Kennesaw%2C+GA&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
+  { name: "Augusta, GA", url: "https://aa.usno.navy.mil/calculated/rstt/year?ID=AA&year=2026&task=0&lat=33.4661&lon=-82.0354&label=Augusta%2C+GA&tz=0.00&tz_sign=-1&submit=Get+Data", category: "Sunrise & Sunset Tables", parent: "sunset-2026" },
 
   // --- Finances ---
   { name: "South State Bank", url: "https://www.southstatebank.com/", category: "Finances" },
