@@ -57,10 +57,20 @@
   .header-row{
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: flex-start;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 24px;
     margin-bottom: 22px;
+  }
+
+  .header-left{
+    flex: 1 1 340px;
+    min-width: 260px;
+  }
+
+  .header-right{
+    flex: 0 1 480px;
+    min-width: 260px;
   }
 
   h1{
@@ -101,7 +111,7 @@
 
   .tide-caption{
     color: var(--text-faint);
-    font-size: 10.5px;
+    font-size: 12px;
     letter-spacing: 0.02em;
     margin-top: 6px;
     text-align: right;
@@ -113,6 +123,13 @@
     width: 100%;
     max-width: 640px;
   }
+
+  #tide-chart-wilm{
+    margin-top: 12px;
+    width: 100%;
+    max-width: 640px;
+  }
+  #tide-chart-wilm .tide-caption{ text-align: left; }
 
   .tide-chart-svg{
     width: 100%;
@@ -500,6 +517,7 @@
     #sun-times{ text-align: left; }
     .tide-caption{ text-align: left; }
     #tide-chart{ max-width: none; margin-left: 0; }
+    #tide-chart-wilm{ max-width: none; }
     .grid{ grid-template-columns: 1fr 1fr; }
   }
 </style>
@@ -508,16 +526,21 @@
 
 <header>
   <div class="header-row">
-    <h1>
-      <svg class="brand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 378 245">
-        <ellipse cx="189.1" cy="123.2" rx="183.8" ry="117.5" fill="#FFFFFF" stroke="#BA0C2F" stroke-width="7.5"/>
-        <path d="M 73.9,44.9 C 115.3,21.7 164,14.3 211,17.3 c 34.3,2.6 68.2,12.4 97.6,30.4 15.9,9.9 30.7,22.4 39.7,39.2 h-83.9 c-19.8,-19.3 -46.3,-32.5 -74.2,-33.2 -20.7,0.4 -41.2,6.5 -58.3,17.9 -12.8,8.5 -23.9,20.4 -28,35.4 -4.3,14.8 0.5,30.7 8.3,43.3 13.4,20.8 37.3,33.3 61.6,35.5 17.3,1.5 34.9,-0.1 51.4,-5.5 18,-5.6 34.3,-18.8 41.8,-36.3 h-111.4 v-33.3 h201.5 c2,-0.4 1.6,2.6 1.9,3.9 0.3,8.6 0.5,17.4 -2.1,25.8 -6.5,23.5 -24.4,42.2 -44.6,55.1 -39.7,25.4 -88,33.9 -134.6,33.4 -25,-1 -50.3,-4.8 -74.1,-13.6 C 82.2,207.3 62,195.4 45.7,179.2 32.6,165.3 21.6,148.5 19.2,129.2 18.3,118.9 18.7,108.3 22.7,98.6 32,74.9 52.4,57.5 73.9,44.9z" fill="#2C2A29"/>
-      </svg>
-      Met's Bookmarks
-    </h1>
-    <div id="clock" class="mono"></div>
-    <div id="sun-times" class="mono"></div>
-    <div id="tide-chart"></div>
+    <div class="header-left">
+      <h1>
+        <svg class="brand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 378 245">
+          <ellipse cx="189.1" cy="123.2" rx="183.8" ry="117.5" fill="#FFFFFF" stroke="#BA0C2F" stroke-width="7.5"/>
+          <path d="M 73.9,44.9 C 115.3,21.7 164,14.3 211,17.3 c 34.3,2.6 68.2,12.4 97.6,30.4 15.9,9.9 30.7,22.4 39.7,39.2 h-83.9 c-19.8,-19.3 -46.3,-32.5 -74.2,-33.2 -20.7,0.4 -41.2,6.5 -58.3,17.9 -12.8,8.5 -23.9,20.4 -28,35.4 -4.3,14.8 0.5,30.7 8.3,43.3 13.4,20.8 37.3,33.3 61.6,35.5 17.3,1.5 34.9,-0.1 51.4,-5.5 18,-5.6 34.3,-18.8 41.8,-36.3 h-111.4 v-33.3 h201.5 c2,-0.4 1.6,2.6 1.9,3.9 0.3,8.6 0.5,17.4 -2.1,25.8 -6.5,23.5 -24.4,42.2 -44.6,55.1 -39.7,25.4 -88,33.9 -134.6,33.4 -25,-1 -50.3,-4.8 -74.1,-13.6 C 82.2,207.3 62,195.4 45.7,179.2 32.6,165.3 21.6,148.5 19.2,129.2 18.3,118.9 18.7,108.3 22.7,98.6 32,74.9 52.4,57.5 73.9,44.9z" fill="#2C2A29"/>
+        </svg>
+        Met's Bookmarks
+      </h1>
+      <div id="tide-chart-wilm"></div>
+    </div>
+    <div class="header-right">
+      <div id="clock" class="mono"></div>
+      <div id="sun-times" class="mono"></div>
+      <div id="tide-chart"></div>
+    </div>
   </div>
   <div class="search-row">
     <input id="search" type="text" placeholder="Search your links…" autocomplete="off">
@@ -1016,10 +1039,9 @@ async function updateSunTimes(){
 updateSunTimes();
 setInterval(updateSunTimes, 30 * 60 * 1000); // this product updates twice daily, no need to poll often
 
-/* ---------- Today + Tomorrow's Tides — Johnnie Mercers Fishing Pier, Wrightsville Beach, NC (station 8658163) ----------
-   Unlike the sunrise/sunset page, tide predictions have a real public JSON API
-   (NOAA's CO-OPS data service), built for exactly this kind of use — no HTML
-   scraping needed here. */
+/* ---------- Today + Tomorrow's Tides, two stations ----------
+   Tide predictions have a real public JSON API (NOAA's CO-OPS data service),
+   built for exactly this kind of use — no HTML scraping needed here. */
 
 // Eastern-timezone today/tomorrow as YYYYMMDD strings for the API's begin/end_date params.
 function easternTodayParts(){
@@ -1037,13 +1059,13 @@ function ymdToApiDate({ y, m, d }){
   return `${y}${String(m).padStart(2, '0')}${String(d).padStart(2, '0')}`;
 }
 
-async function fetchTideRange(interval){
+async function fetchTideRange(interval, stationId){
   const todayParts = easternTodayParts();
   const tomorrowParts = addOneDay(todayParts);
   const params = new URLSearchParams({
     begin_date: ymdToApiDate(todayParts),
     end_date: ymdToApiDate(tomorrowParts),
-    station: '8658163',
+    station: stationId,
     product: 'predictions',
     datum: 'MLLW',
     time_zone: 'lst_ldt',
@@ -1059,9 +1081,6 @@ async function fetchTideRange(interval){
   if (data.error) throw new Error(data.error.message || 'Tides API returned an error');
   return { predictions: data.predictions || [], startDate: todayParts };
 }
-
-const fetchTodayTides = () => fetchTideRange('hilo');
-const fetchTideCurve = () => fetchTideRange('6');
 
 function formatTideTime(t){
   // t looks like "2026-08-25 03:12"
@@ -1099,26 +1118,24 @@ function interpolateTideValue(curve, minutes){
   return curve[curve.length - 1].v;
 }
 
-let activeTideChart = null; // holds scale functions + curve so the "now" marker can move without refetching
-
-// Coastal flood thresholds for high tide, worst-applicable stage wins.
+// Coastal flood thresholds for high tide, worst-applicable stage wins per station.
 // Note: these are astronomical predictions only — no storm surge is factored in,
 // so this flags exceptional astronomical tides, not storm-driven flood events.
-const FLOOD_THRESHOLDS = [
-  { name: 'Action Stage', value: 5.5, color: 'var(--status-slgt)', cls: 'flood-action' },
-  { name: 'Minor Flooding', value: 6.0, color: 'var(--status-enh)', cls: 'flood-minor' },
-  { name: 'Moderate Flooding', value: 8.0, color: 'var(--status-mdt)', cls: 'flood-moderate' },
-  { name: 'Major Flooding', value: 10.0, color: 'var(--status-high)', cls: 'flood-major' },
-];
-function floodThresholdFor(v){
+function floodThresholdFor(v, thresholds){
   let matched = null;
-  for (const t of FLOOD_THRESHOLDS){
+  for (const t of thresholds){
     if (v >= t.value) matched = t;
   }
   return matched;
 }
 
-function renderTideChart(el, curve, hiLo, startParts){
+// Each station tracks its own scale functions + curve so its "now" marker can
+// move every minute without refetching, keyed by DOM element id.
+const activeTideCharts = {};
+
+function renderTideChart(el, curve, hiLo, startParts, thresholds, caption){
+  const nowLineId = `tide-now-line-${el.id}`;
+  const nowDotId = `tide-now-dot-${el.id}`;
   const SPAN_MINUTES = 2880; // 48 hours
   const W = 760, H = 280, padTop = 76, padBottom = 84, padX = 10;
   const plotH = H - padTop - padBottom;
@@ -1133,6 +1150,7 @@ function renderTideChart(el, curve, hiLo, startParts){
 
   const lineD = 'M' + curve.map(p => `${xScale(p.minutes).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(' L');
   const areaD = `${lineD} L${xScale(curve[curve.length - 1].minutes).toFixed(1)},${baseline} L${xScale(curve[0].minutes).toFixed(1)},${baseline} Z`;
+  const fillId = `tideFill-${el.id}`;
 
   // Every high/low gets its own two-line label (time, then height) instead of a
   // separate pill row — highs label upward from the dot, lows label downward.
@@ -1144,7 +1162,7 @@ function renderTideChart(el, curve, hiLo, startParts){
     const isHigh = p.type === 'H';
     const timeY = isHigh ? y - 38 : y + 26;
     const heightY = isHigh ? y - 20 : y + 44;
-    const flood = isHigh ? floodThresholdFor(v) : null;
+    const flood = isHigh ? floodThresholdFor(v, thresholds) : null;
 
     const dotFill = flood ? flood.color : (isHigh ? 'var(--accent)' : 'var(--text-muted)');
     const ring = flood ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="none" stroke="${flood.color}" stroke-width="1.5" />` : '';
@@ -1186,58 +1204,90 @@ function renderTideChart(el, curve, hiLo, startParts){
   el.innerHTML = `
     <svg viewBox="0 0 ${W} ${H}" class="tide-chart-svg" preserveAspectRatio="none">
       <defs>
-        <linearGradient id="tideFill" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35" />
           <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
         </linearGradient>
       </defs>
-      <path d="${areaD}" fill="url(#tideFill)" stroke="none" />
+      <path d="${areaD}" fill="url(#${fillId})" stroke="none" />
       <path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
       ${dividerHTML}
       ${sectionLabelsHTML}
       ${markersHTML}
-      <line id="tide-now-line" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
-      <circle id="tide-now-dot" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
+      <line id="${nowLineId}" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
+      <circle id="${nowDotId}" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
     </svg>
-    <div class="tide-caption">Johnnie Mercers Fishing Pier, Wrightsville Beach, NC</div>
+    <div class="tide-caption">${caption}</div>
   `;
 
-  activeTideChart = { curve, xScale, yScale };
+  activeTideCharts[el.id] = { curve, xScale, yScale, nowLineId, nowDotId };
 }
 
-function moveTideNowMarker(){
-  if (!activeTideChart) return;
-  const { curve, xScale, yScale } = activeTideChart;
-  const nowMinutes = easternMinutesOfDay(new Date());
-  const x = xScale(nowMinutes);
-  const y = yScale(interpolateTideValue(curve, nowMinutes));
-  const line = document.getElementById('tide-now-line');
-  const dot = document.getElementById('tide-now-dot');
-  if (line){ line.setAttribute('x1', x.toFixed(1)); line.setAttribute('x2', x.toFixed(1)); }
-  if (dot){ dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); }
+function moveTideNowMarkers(){
+  Object.values(activeTideCharts).forEach(({ curve, xScale, yScale, nowLineId, nowDotId }) => {
+    const nowMinutes = easternMinutesOfDay(new Date());
+    const x = xScale(nowMinutes);
+    const y = yScale(interpolateTideValue(curve, nowMinutes));
+    const line = document.getElementById(nowLineId);
+    const dot = document.getElementById(nowDotId);
+    if (line){ line.setAttribute('x1', x.toFixed(1)); line.setAttribute('x2', x.toFixed(1)); }
+    if (dot){ dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); }
+  });
 }
 
-async function updateTideDisplay(){
-  const chartEl = document.getElementById('tide-chart');
+const TIDE_STATIONS = [
+  {
+    id: '8658163',
+    elId: 'tide-chart',
+    caption: 'Johnnie Mercers Fishing Pier - Wrightsville Beach, NC',
+    thresholds: [
+      { name: 'Action Stage', value: 5.5, color: 'var(--status-slgt)', cls: 'flood-action' },
+      { name: 'Minor Flooding', value: 6.0, color: 'var(--status-enh)', cls: 'flood-minor' },
+      { name: 'Moderate Flooding', value: 8.0, color: 'var(--status-mdt)', cls: 'flood-moderate' },
+      { name: 'Major Flooding', value: 10.0, color: 'var(--status-high)', cls: 'flood-major' },
+    ],
+  },
+  {
+    id: '8658120',
+    elId: 'tide-chart-wilm',
+    caption: 'Cape Fear River - Wilmington, NC',
+    thresholds: [
+      { name: 'Action Stage', value: 5.0, color: 'var(--status-slgt)', cls: 'flood-action' },
+      { name: 'Minor Flooding', value: 5.5, color: 'var(--status-enh)', cls: 'flood-minor' },
+      { name: 'Moderate Flooding', value: 6.75, color: 'var(--status-mdt)', cls: 'flood-moderate' },
+      { name: 'Major Flooding', value: 10.0, color: 'var(--status-high)', cls: 'flood-major' },
+    ],
+  },
+];
+
+async function updateStationTideDisplay(station){
+  const chartEl = document.getElementById(station.elId);
   if (!chartEl) return;
   try {
-    const [hiLoResult, curveResult] = await Promise.all([fetchTodayTides(), fetchTideCurve()]);
+    const [hiLoResult, curveResult] = await Promise.all([
+      fetchTideRange('hilo', station.id),
+      fetchTideRange('6', station.id),
+    ]);
     const { predictions: hiLo, startDate } = hiLoResult;
     const curve = curveResult.predictions.map(p => ({ minutes: minutesSinceStart(p.t, startDate), v: parseFloat(p.v) }));
 
     if (curve.length > 0){
-      renderTideChart(chartEl, curve, hiLo, startDate);
+      renderTideChart(chartEl, curve, hiLo, startDate, station.thresholds, station.caption);
     } else {
       chartEl.innerHTML = '';
     }
   } catch (err){
     chartEl.innerHTML = '';
-    console.error('Tide data fetch failed:', err);
+    console.error(`Tide data fetch failed for station ${station.id}:`, err);
   }
 }
-updateTideDisplay();
-setInterval(updateTideDisplay, 60 * 60 * 1000); // rolls the range forward each hour so "tomorrow" keeps advancing
-setInterval(moveTideNowMarker, 60 * 1000); // reposition the "now" marker every minute without refetching
+
+function updateAllTideDisplays(){
+  TIDE_STATIONS.forEach(updateStationTideDisplay);
+}
+updateAllTideDisplays();
+setInterval(updateAllTideDisplays, 60 * 60 * 1000); // rolls the range forward each hour so "tomorrow" keeps advancing
+setInterval(moveTideNowMarkers, 60 * 1000); // reposition each "now" marker every minute without refetching
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
    Each county's boundary is real US Census TIGER data, small/simple
