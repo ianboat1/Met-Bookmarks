@@ -99,52 +99,11 @@
     margin-top: 3px;
   }
 
-  #tide-times{
-    margin-top: 5px;
-    max-width: 480px;
-  }
-
-  .tide-day-label{
-    color: var(--text-faint);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    text-align: right;
-    margin-top: 6px;
-    margin-bottom: 3px;
-  }
-  .tide-day-label:first-child{ margin-top: 0; }
-
-  .tide-pills{
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    justify-content: flex-end;
-  }
-
-  .tide-pill{
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 3px 10px;
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    color: var(--text);
-  }
-
-  .tide-pill .tide-icon{ font-size: 9px; }
-  .tide-pill.high .tide-icon{ color: var(--accent); }
-  .tide-pill.low .tide-icon{ color: var(--text-muted); }
-
   .tide-caption{
     color: var(--text-faint);
     font-size: 10.5px;
     letter-spacing: 0.02em;
-    margin-top: 5px;
+    margin-top: 6px;
     text-align: right;
   }
 
@@ -152,7 +111,7 @@
     margin-top: 8px;
     margin-left: auto;
     width: 100%;
-    max-width: 480px;
+    max-width: 640px;
   }
 
   .tide-chart-svg{
@@ -165,6 +124,15 @@
     font-family: Georgia, 'Times New Roman', serif;
     font-size: 8px;
     fill: var(--text-faint);
+  }
+
+  .tide-chart-label.height{ fill: var(--text-muted); }
+
+  .tide-chart-section-label{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    fill: var(--text-muted);
   }
 
   .search-row{
@@ -510,9 +478,6 @@
     .header-row{ flex-direction: column; align-items: flex-start; }
     #clock{ text-align: left; }
     #sun-times{ text-align: left; }
-    #tide-times{ max-width: none; }
-    .tide-pills{ justify-content: flex-start; }
-    .tide-day-label{ text-align: left; }
     .tide-caption{ text-align: left; }
     #tide-chart{ max-width: none; margin-left: 0; }
     .grid{ grid-template-columns: 1fr 1fr; }
@@ -532,7 +497,6 @@
     </h1>
     <div id="clock" class="mono"></div>
     <div id="sun-times" class="mono"></div>
-    <div id="tide-times" class="mono"></div>
     <div id="tide-chart"></div>
   </div>
   <div class="search-row">
@@ -1115,7 +1079,7 @@ let activeTideChart = null; // holds scale functions + curve so the "now" marker
 
 function renderTideChart(el, curve, hiLo, startParts){
   const SPAN_MINUTES = 2880; // 48 hours
-  const W = 760, H = 110, padTop = 22, padBottom = 22, padX = 6;
+  const W = 760, H = 190, padTop = 42, padBottom = 42, padX = 10;
   const plotH = H - padTop - padBottom;
   const baseline = padTop + plotH;
   const values = curve.map(p => p.v);
@@ -1129,18 +1093,28 @@ function renderTideChart(el, curve, hiLo, startParts){
   const lineD = 'M' + curve.map(p => `${xScale(p.minutes).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(' L');
   const areaD = `${lineD} L${xScale(curve[curve.length - 1].minutes).toFixed(1)},${baseline} L${xScale(curve[0].minutes).toFixed(1)},${baseline} Z`;
 
+  // Every high/low gets its own two-line label (time, then height) instead of a
+  // separate pill row — highs label upward from the dot, lows label downward.
   const markersHTML = hiLo.map(p => {
     const minutes = minutesSinceStart(p.t, startParts);
     const v = parseFloat(p.v);
     const x = xScale(minutes);
     const y = yScale(v);
     const isHigh = p.type === 'H';
-    const labelY = isHigh ? y - 8 : y + 15;
+    const timeY = isHigh ? y - 22 : y + 16;
+    const heightY = isHigh ? y - 11 : y + 27;
     return `
       <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${isHigh ? 'var(--accent)' : 'var(--text-muted)'}" />
-      <text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" class="tide-chart-label">${formatTideTime(p.t)}</text>
+      <text x="${x.toFixed(1)}" y="${timeY.toFixed(1)}" text-anchor="middle" class="tide-chart-label">${formatTideTime(p.t)}</text>
+      <text x="${x.toFixed(1)}" y="${heightY.toFixed(1)}" text-anchor="middle" class="tide-chart-label height">${v.toFixed(2)} ft MLLW</text>
     `;
   }).join('');
+
+  // Today / Tomorrow section labels, up in the top margin.
+  const sectionLabelsHTML = `
+    <text x="${xScale(720).toFixed(1)}" y="12" text-anchor="middle" class="tide-chart-section-label">TODAY</text>
+    <text x="${xScale(2160).toFixed(1)}" y="12" text-anchor="middle" class="tide-chart-section-label">TOMORROW</text>
+  `;
 
   // Divider marking the today/tomorrow boundary, with tomorrow's date labeled.
   const tomorrowParts = addOneDay(startParts);
@@ -1149,7 +1123,7 @@ function renderTideChart(el, curve, hiLo, startParts){
     .toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
   const dividerHTML = `
     <line x1="${boundaryX.toFixed(1)}" y1="${padTop}" x2="${boundaryX.toFixed(1)}" y2="${baseline}" stroke="var(--border-hover)" stroke-width="1" stroke-dasharray="3,3" />
-    <text x="${boundaryX.toFixed(1)}" y="${H - 5}" text-anchor="middle" class="tide-chart-label">${boundaryLabel}</text>
+    <text x="${boundaryX.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="tide-chart-label">${boundaryLabel}</text>
   `;
 
   const nowMinutes = easternMinutesOfDay(new Date());
@@ -1167,10 +1141,12 @@ function renderTideChart(el, curve, hiLo, startParts){
       <path d="${areaD}" fill="url(#tideFill)" stroke="none" />
       <path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
       ${dividerHTML}
+      ${sectionLabelsHTML}
       ${markersHTML}
       <line id="tide-now-line" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
       <circle id="tide-now-dot" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
     </svg>
+    <div class="tide-caption">Johnnie Mercers Fishing Pier, Wrightsville Beach, NC</div>
   `;
 
   activeTideChart = { curve, xScale, yScale };
@@ -1188,48 +1164,21 @@ function moveTideNowMarker(){
   if (dot){ dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); }
 }
 
-function tidePillsHTML(events){
-  return events.map(p => {
-    const isHigh = p.type === 'H';
-    const icon = isHigh ? '▲' : '▼';
-    const time = formatTideTime(p.t);
-    const height = parseFloat(p.v).toFixed(2);
-    return `<span class="tide-pill ${isHigh ? 'high' : 'low'}"><span class="tide-icon">${icon}</span>${time} · ${height} ft MLLW</span>`;
-  }).join('');
-}
-
 async function updateTideDisplay(){
-  const pillsEl = document.getElementById('tide-times');
   const chartEl = document.getElementById('tide-chart');
+  if (!chartEl) return;
   try {
     const [hiLoResult, curveResult] = await Promise.all([fetchTodayTides(), fetchTideCurve()]);
     const { predictions: hiLo, startDate } = hiLoResult;
     const curve = curveResult.predictions.map(p => ({ minutes: minutesSinceStart(p.t, startDate), v: parseFloat(p.v) }));
 
-    if (pillsEl){
-      if (hiLo.length === 0){
-        pillsEl.textContent = '';
-      } else {
-        const todayEvents = hiLo.filter(p => minutesSinceStart(p.t, startDate) < 1440);
-        const tomorrowEvents = hiLo.filter(p => minutesSinceStart(p.t, startDate) >= 1440);
-        pillsEl.innerHTML = `
-          <div class="tide-day-label">Today</div>
-          <div class="tide-pills">${tidePillsHTML(todayEvents)}</div>
-          ${tomorrowEvents.length ? `
-            <div class="tide-day-label">Tomorrow</div>
-            <div class="tide-pills">${tidePillsHTML(tomorrowEvents)}</div>
-          ` : ''}
-          <div class="tide-caption">Johnnie Mercers Fishing Pier, Wrightsville Beach, NC</div>
-        `;
-      }
-    }
-
-    if (chartEl && curve.length > 0){
+    if (curve.length > 0){
       renderTideChart(chartEl, curve, hiLo, startDate);
+    } else {
+      chartEl.innerHTML = '';
     }
   } catch (err){
-    if (pillsEl) pillsEl.textContent = '';
-    if (chartEl) chartEl.innerHTML = '';
+    chartEl.innerHTML = '';
     console.error('Tide data fetch failed:', err);
   }
 }
