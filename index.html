@@ -91,6 +91,14 @@
 
   #clock span{ color: var(--text); }
 
+  #sun-times{
+    color: var(--text-faint);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-align: right;
+    margin-top: 3px;
+  }
+
   .search-row{
     display: flex;
     gap: 10px;
@@ -433,6 +441,7 @@
     h1{ font-size: 22px; }
     .header-row{ flex-direction: column; align-items: flex-start; }
     #clock{ text-align: left; }
+    #sun-times{ text-align: left; }
     .grid{ grid-template-columns: 1fr 1fr; }
   }
 </style>
@@ -449,6 +458,7 @@
       Met's Bookmarks
     </h1>
     <div id="clock" class="mono"></div>
+    <div id="sun-times" class="mono"></div>
   </div>
   <div class="search-row">
     <input id="search" type="text" placeholder="Search your links…" autocomplete="off">
@@ -899,6 +909,49 @@ function tick(){
 }
 tick();
 setInterval(tick, 1000);
+
+/* ---------- Sunrise/Sunset for Wilmington, NC ----------
+   Pulled from NWS Wilmington's daily Climate Summary product (the same
+   product you linked). This is a live NWS page, not a data API, so it's
+   fetched and parsed as text; glossary=0 keeps the text free of the
+   inline glossary links NWS adds when glossary=1. Only "today"'s line
+   (the first of the two listed) is used. */
+async function fetchIlmSunTimes(){
+  const url = 'https://forecast.weather.gov/product.php?site=NWS&issuedby=ILM&product=CLI&format=TXT&version=1&glossary=0';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`NWS responded ${res.status}`);
+  const text = await res.text();
+
+  // e.g. "AUGUST 25 2026........SUNRISE   640 AM EDT   SUNSET   747 PM EDT"
+  const match = text.match(/[A-Z]+\s+\d{1,2}\s+\d{4}\.+SUNRISE\s+(\d{3,4})\s+(AM|PM)\s+(\S+)\s+SUNSET\s+(\d{3,4})\s+(AM|PM)\s+(\S+)/);
+  if (!match) throw new Error('Could not find a SUNRISE/SUNSET line in the NWS product text');
+
+  const formatTime = raw => {
+    const hourDigits = raw.length === 3 ? 1 : 2;
+    const hour = parseInt(raw.slice(0, hourDigits), 10);
+    const minute = raw.slice(hourDigits);
+    return `${hour}:${minute}`;
+  };
+
+  return {
+    sunrise: `${formatTime(match[1])} ${match[2]}`,
+    sunset: `${formatTime(match[4])} ${match[5]}`,
+  };
+}
+
+async function updateSunTimes(){
+  const el = document.getElementById('sun-times');
+  if (!el) return;
+  try {
+    const { sunrise, sunset } = await fetchIlmSunTimes();
+    el.textContent = `☀ ${sunrise} · 🌇 ${sunset} (Wilmington, NC)`;
+  } catch (err){
+    el.textContent = '';
+    console.error('ILM sunrise/sunset fetch failed:', err);
+  }
+}
+updateSunTimes();
+setInterval(updateSunTimes, 30 * 60 * 1000); // this product updates twice daily, no need to poll often
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
    Each county's boundary is real US Census TIGER data, small/simple
