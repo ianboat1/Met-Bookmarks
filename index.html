@@ -475,37 +475,6 @@
     padding: 60px 0;
   }
 
-  /* ---------- Live status note ---------- */
-  .status-note{
-    max-width: 1200px;
-    margin: 0 auto 30px;
-    background: var(--bg-elevated);
-    border: 1px dashed var(--border-hover);
-    border-radius: var(--radius);
-    padding: 14px 16px;
-    font-size: 12.5px;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-  .status-note button{
-    background: var(--bg);
-    color: var(--accent);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-family: Georgia, 'Times New Roman', serif;
-    font-size: 12px;
-    cursor: pointer;
-    transition: border-color .15s ease;
-  }
-  .status-note button:hover{ border-color: var(--accent); }
-  .status-note button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
-  .status-note button:disabled{ opacity: .5; cursor: default; }
-
   @media (prefers-reduced-motion: reduce){
     html{ scroll-behavior: auto; }
   }
@@ -547,12 +516,6 @@
   </div>
   <div id="chips" class="chips"></div>
 </header>
-
-<div class="status-note">
-  ⚡ <strong style="color:var(--text)">Carolinas SPC Outlooks</strong> and <strong style="color:var(--text)">Georgia SPC Outlooks</strong> below each show the highest risk category touching their tracked counties — checked automatically every 15 min.
-  <button id="spc-refresh" type="button">Refresh now</button>
-  <span id="spc-updated" class="mono"></span>
-</div>
 
 <main id="main"></main>
 <p id="empty-state">No links match “<span id="empty-query" class="mono"></span>”</p>
@@ -1379,7 +1342,6 @@ async function updateLiveOutlooks(){
   render();
 }
 
-document.getElementById('spc-refresh').addEventListener('click', updateLiveOutlooks);
 updateLiveOutlooks();
 setInterval(updateLiveOutlooks, 15 * 60 * 1000); // re-check every 15 minutes
 
