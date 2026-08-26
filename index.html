@@ -137,6 +137,25 @@
     text-align: right;
   }
 
+  #tide-chart{
+    margin-top: 8px;
+    margin-left: auto;
+    width: 100%;
+    max-width: 480px;
+  }
+
+  .tide-chart-svg{
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .tide-chart-label{
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 8px;
+    fill: var(--text-faint);
+  }
+
   .search-row{
     display: flex;
     gap: 10px;
@@ -483,6 +502,7 @@
     #tide-times{ max-width: none; }
     .tide-pills{ justify-content: flex-start; }
     .tide-caption{ text-align: left; }
+    #tide-chart{ max-width: none; margin-left: 0; }
     .grid{ grid-template-columns: 1fr 1fr; }
   }
 </style>
@@ -501,6 +521,7 @@
     <div id="clock" class="mono"></div>
     <div id="sun-times" class="mono"></div>
     <div id="tide-times" class="mono"></div>
+    <div id="tide-chart"></div>
   </div>
   <div class="search-row">
     <input id="search" type="text" placeholder="Search your links…" autocomplete="off">
@@ -1028,33 +1049,151 @@ function formatTideTime(t){
   return `${hour}:${mStr} ${ampm}`;
 }
 
-async function updateTideTimes(){
-  const el = document.getElementById('tide-times');
-  if (!el) return;
-  try {
-    const predictions = await fetchTodayTides();
-    if (predictions.length === 0){
-      el.textContent = '';
-      return;
+function minutesFromTideTimestamp(t){
+  const [hStr, mStr] = t.split(' ')[1].split(':');
+  return parseInt(hStr, 10) * 60 + parseInt(mStr, 10);
+}
+
+// Fine-resolution predictions (6-min steps) for drawing the actual curve —
+// same API as the pills, just without interval=hilo.
+async function fetchTideCurve(){
+  const params = new URLSearchParams({
+    date: 'today',
+    station: '8658163',
+    product: 'predictions',
+    datum: 'MLLW',
+    time_zone: 'lst_ldt',
+    units: 'english',
+    interval: '6',
+    application: 'personal_bookmarks_dashboard',
+    format: 'json',
+  });
+  const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Tides API responded ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || 'Tides API returned an error');
+  return (data.predictions || []).map(p => ({ minutes: minutesFromTideTimestamp(p.t), v: parseFloat(p.v) }));
+}
+
+function easternMinutesOfDay(date){
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(date);
+  return (parseInt(part(parts, 'hour'), 10) % 24) * 60 + parseInt(part(parts, 'minute'), 10);
+}
+
+function interpolateTideValue(curve, minutes){
+  for (let i = 0; i < curve.length - 1; i++){
+    if (minutes >= curve[i].minutes && minutes <= curve[i + 1].minutes){
+      const t = (minutes - curve[i].minutes) / (curve[i + 1].minutes - curve[i].minutes);
+      return curve[i].v + t * (curve[i + 1].v - curve[i].v);
     }
-    const pills = predictions.map(p => {
-      const isHigh = p.type === 'H';
-      const icon = isHigh ? '▲' : '▼';
-      const time = formatTideTime(p.t);
-      const height = parseFloat(p.v).toFixed(2);
-      return `<span class="tide-pill ${isHigh ? 'high' : 'low'}"><span class="tide-icon">${icon}</span>${time} · ${height} ft MLLW</span>`;
-    });
-    el.innerHTML = `
-      <div class="tide-pills">${pills.join('')}</div>
-      <div class="tide-caption">Johnnie Mercers Fishing Pier, Wrightsville Beach, NC</div>
+  }
+  return curve[curve.length - 1].v;
+}
+
+let activeTideChart = null; // holds scale functions + curve so the "now" marker can move without refetching
+
+function renderTideChart(el, curve, hiLo){
+  const W = 440, H = 110, padTop = 22, padBottom = 22, padX = 6;
+  const plotH = H - padTop - padBottom;
+  const baseline = padTop + plotH;
+  const values = curve.map(p => p.v);
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const spanV = (maxV - minV) || 1;
+
+  const xScale = m => padX + (m / 1440) * (W - 2 * padX);
+  const yScale = v => padTop + (1 - (v - minV) / spanV) * plotH;
+
+  const lineD = 'M' + curve.map(p => `${xScale(p.minutes).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(' L');
+  const areaD = `${lineD} L${xScale(curve[curve.length - 1].minutes).toFixed(1)},${baseline} L${xScale(curve[0].minutes).toFixed(1)},${baseline} Z`;
+
+  const markersHTML = hiLo.map(p => {
+    const minutes = minutesFromTideTimestamp(p.t);
+    const v = parseFloat(p.v);
+    const x = xScale(minutes);
+    const y = yScale(v);
+    const isHigh = p.type === 'H';
+    const labelY = isHigh ? y - 8 : y + 15;
+    return `
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${isHigh ? 'var(--accent)' : 'var(--text-muted)'}" />
+      <text x="${x.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" class="tide-chart-label">${formatTideTime(p.t)}</text>
     `;
+  }).join('');
+
+  const nowMinutes = easternMinutesOfDay(new Date());
+  const nowX = xScale(nowMinutes);
+  const nowY = yScale(interpolateTideValue(curve, nowMinutes));
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="tide-chart-svg" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="tideFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35" />
+          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#tideFill)" stroke="none" />
+      <path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
+      ${markersHTML}
+      <line id="tide-now-line" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
+      <circle id="tide-now-dot" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
+    </svg>
+  `;
+
+  activeTideChart = { curve, xScale, yScale };
+}
+
+function moveTideNowMarker(){
+  if (!activeTideChart) return;
+  const { curve, xScale, yScale } = activeTideChart;
+  const nowMinutes = easternMinutesOfDay(new Date());
+  const x = xScale(nowMinutes);
+  const y = yScale(interpolateTideValue(curve, nowMinutes));
+  const line = document.getElementById('tide-now-line');
+  const dot = document.getElementById('tide-now-dot');
+  if (line){ line.setAttribute('x1', x.toFixed(1)); line.setAttribute('x2', x.toFixed(1)); }
+  if (dot){ dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); }
+}
+
+async function updateTideDisplay(){
+  const pillsEl = document.getElementById('tide-times');
+  const chartEl = document.getElementById('tide-chart');
+  try {
+    const [hiLo, curve] = await Promise.all([fetchTodayTides(), fetchTideCurve()]);
+
+    if (pillsEl){
+      if (hiLo.length === 0){
+        pillsEl.textContent = '';
+      } else {
+        const pills = hiLo.map(p => {
+          const isHigh = p.type === 'H';
+          const icon = isHigh ? '▲' : '▼';
+          const time = formatTideTime(p.t);
+          const height = parseFloat(p.v).toFixed(2);
+          return `<span class="tide-pill ${isHigh ? 'high' : 'low'}"><span class="tide-icon">${icon}</span>${time} · ${height} ft MLLW</span>`;
+        });
+        pillsEl.innerHTML = `
+          <div class="tide-pills">${pills.join('')}</div>
+          <div class="tide-caption">Johnnie Mercers Fishing Pier, Wrightsville Beach, NC</div>
+        `;
+      }
+    }
+
+    if (chartEl && curve.length > 0){
+      renderTideChart(chartEl, curve, hiLo);
+    }
   } catch (err){
-    el.textContent = '';
-    console.error('Tide predictions fetch failed:', err);
+    if (pillsEl) pillsEl.textContent = '';
+    if (chartEl) chartEl.innerHTML = '';
+    console.error('Tide data fetch failed:', err);
   }
 }
-updateTideTimes();
-setInterval(updateTideTimes, 60 * 60 * 1000); // today's predictions don't change; hourly just rolls into the next day
+updateTideDisplay();
+setInterval(updateTideDisplay, 60 * 60 * 1000); // today's predictions don't change; hourly just rolls into the next day
+setInterval(moveTideNowMarker, 60 * 1000); // reposition the "now" marker every minute without refetching
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
    Each county's boundary is real US Census TIGER data, small/simple
