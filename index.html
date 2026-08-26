@@ -122,15 +122,15 @@
 
   .tide-chart-label{
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 8px;
-    fill: var(--text-faint);
+    font-size: 13px;
+    fill: var(--text);
   }
 
   .tide-chart-label.height{ fill: var(--text-muted); }
 
   .tide-chart-section-label{
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 9.5px;
+    font-size: 14px;
     letter-spacing: 0.1em;
     fill: var(--text-muted);
   }
@@ -1079,7 +1079,7 @@ let activeTideChart = null; // holds scale functions + curve so the "now" marker
 
 function renderTideChart(el, curve, hiLo, startParts){
   const SPAN_MINUTES = 2880; // 48 hours
-  const W = 760, H = 190, padTop = 42, padBottom = 42, padX = 10;
+  const W = 760, H = 280, padTop = 76, padBottom = 84, padX = 10;
   const plotH = H - padTop - padBottom;
   const baseline = padTop + plotH;
   const values = curve.map(p => p.v);
@@ -1101,10 +1101,10 @@ function renderTideChart(el, curve, hiLo, startParts){
     const x = xScale(minutes);
     const y = yScale(v);
     const isHigh = p.type === 'H';
-    const timeY = isHigh ? y - 22 : y + 16;
-    const heightY = isHigh ? y - 11 : y + 27;
+    const timeY = isHigh ? y - 38 : y + 26;
+    const heightY = isHigh ? y - 20 : y + 44;
     return `
-      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="${isHigh ? 'var(--accent)' : 'var(--text-muted)'}" />
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${isHigh ? 'var(--accent)' : 'var(--text-muted)'}" />
       <text x="${x.toFixed(1)}" y="${timeY.toFixed(1)}" text-anchor="middle" class="tide-chart-label">${formatTideTime(p.t)}</text>
       <text x="${x.toFixed(1)}" y="${heightY.toFixed(1)}" text-anchor="middle" class="tide-chart-label height">${v.toFixed(2)} ft MLLW</text>
     `;
@@ -1112,8 +1112,8 @@ function renderTideChart(el, curve, hiLo, startParts){
 
   // Today / Tomorrow section labels, up in the top margin.
   const sectionLabelsHTML = `
-    <text x="${xScale(720).toFixed(1)}" y="12" text-anchor="middle" class="tide-chart-section-label">TODAY</text>
-    <text x="${xScale(2160).toFixed(1)}" y="12" text-anchor="middle" class="tide-chart-section-label">TOMORROW</text>
+    <text x="${xScale(720).toFixed(1)}" y="18" text-anchor="middle" class="tide-chart-section-label">TODAY</text>
+    <text x="${xScale(2160).toFixed(1)}" y="18" text-anchor="middle" class="tide-chart-section-label">TOMORROW</text>
   `;
 
   // Divider marking the today/tomorrow boundary, with tomorrow's date labeled.
