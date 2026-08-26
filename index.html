@@ -99,6 +99,15 @@
     margin-top: 3px;
   }
 
+  #tide-times{
+    color: var(--text);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-align: right;
+    margin-top: 3px;
+    max-width: 480px;
+  }
+
   .search-row{
     display: flex;
     gap: 10px;
@@ -442,6 +451,7 @@
     .header-row{ flex-direction: column; align-items: flex-start; }
     #clock{ text-align: left; }
     #sun-times{ text-align: left; }
+    #tide-times{ text-align: left; max-width: none; }
     .grid{ grid-template-columns: 1fr 1fr; }
   }
 </style>
@@ -459,6 +469,7 @@
     </h1>
     <div id="clock" class="mono"></div>
     <div id="sun-times" class="mono"></div>
+    <div id="tide-times" class="mono"></div>
   </div>
   <div class="search-row">
     <input id="search" type="text" placeholder="Search your links…" autocomplete="off">
@@ -952,6 +963,63 @@ async function updateSunTimes(){
 }
 updateSunTimes();
 setInterval(updateSunTimes, 30 * 60 * 1000); // this product updates twice daily, no need to poll often
+
+/* ---------- Today's Tides — Johnnie Mercers Fishing Pier, Wrightsville Beach, NC (station 8658163) ----------
+   Unlike the sunrise/sunset page, tide predictions have a real public JSON API
+   (NOAA's CO-OPS data service), built for exactly this kind of use — no HTML
+   scraping needed here. */
+async function fetchTodayTides(){
+  const params = new URLSearchParams({
+    date: 'today',
+    station: '8658163',
+    product: 'predictions',
+    datum: 'MLLW',
+    time_zone: 'lst_ldt',
+    units: 'english',
+    interval: 'hilo',
+    application: 'personal_bookmarks_dashboard',
+    format: 'json',
+  });
+  const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Tides API responded ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || 'Tides API returned an error');
+  return data.predictions || [];
+}
+
+function formatTideTime(t){
+  // t looks like "2026-08-25 03:12"
+  const [hStr, mStr] = t.split(' ')[1].split(':');
+  let hour = parseInt(hStr, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12;
+  return `${hour}:${mStr} ${ampm}`;
+}
+
+async function updateTideTimes(){
+  const el = document.getElementById('tide-times');
+  if (!el) return;
+  try {
+    const predictions = await fetchTodayTides();
+    if (predictions.length === 0){
+      el.textContent = '';
+      return;
+    }
+    const parts = predictions.map(p => {
+      const icon = p.type === 'H' ? '▲' : '▼';
+      const time = formatTideTime(p.t);
+      const height = parseFloat(p.v).toFixed(2);
+      return `${icon} ${time} ${height} ft MLLW`;
+    });
+    el.textContent = `${parts.join('   ')} (Johnnie Mercers Pier)`;
+  } catch (err){
+    el.textContent = '';
+    console.error('Tide predictions fetch failed:', err);
+  }
+}
+updateTideTimes();
+setInterval(updateTideTimes, 60 * 60 * 1000); // today's predictions don't change; hourly just rolls into the next day
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
    Each county's boundary is real US Census TIGER data, small/simple
