@@ -1403,7 +1403,7 @@ async function fetchArcgisOutlookForRings(layerUrl, rings){
   const params = new URLSearchParams({
     f: 'geojson',
     where: '1=1',
-    outFields: 'dn,label,label2,valid,expire,issue,outlook,product',
+    outFields: 'dn',
     geometry: JSON.stringify({ rings }),
     geometryType: 'esriGeometryPolygon',
     spatialRel: 'esriSpatialRelIntersects',
