@@ -601,7 +601,7 @@ const LINKS = [
   { name: "REFS Viewer", url: "https://www.spc.noaa.gov/internal/exper/refs/", category: "Maps & Analysis", parent: "spc" },
   { name: "Internal Page", url: "https://www.spc.noaa.gov/internal/", category: "Maps & Analysis", parent: "spc" },
 
-  // Live-outlook links — each has an id so the LIVE_OUTLOOK_TARGETS block
+  // Live-outlook links — each has an id so the OUTLOOK_FEEDS block
   // below can find it and fill in its status automatically.
   { id: "carolinas-outlook", name: "Carolinas SPC Outlooks", url: "https://www.spc.noaa.gov/partners/outlooks/requests/NCSC/", category: "Maps & Analysis",
     status: [{ name: "New Hanover County, NC", label: "…", color: "var(--status-none)", dn: -1 }] },
@@ -618,7 +618,7 @@ const LINKS = [
   { name: "Fronts", url: "https://www.wpc.ncep.noaa.gov/#page=frt", category: "Maps & Analysis", parent: "wpc" },
   { name: "QPF", url: "https://www.wpc.ncep.noaa.gov/#page=qpf", category: "Maps & Analysis", parent: "wpc" },
 
-  { id: "ero-by-state", name: "ERO by State", category: "Maps & Analysis", parent: "wpc" }, // no url = label only
+  { id: "ero-by-state", name: "ERO by State", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/", category: "Maps & Analysis", parent: "wpc" },
   { name: "SC Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day1.png", category: "Maps & Analysis", parent: "ero-by-state" },
   { name: "SC Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day2.png", category: "Maps & Analysis", parent: "ero-by-state" },
   { name: "SC Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day3.png", category: "Maps & Analysis", parent: "ero-by-state" },
@@ -643,6 +643,27 @@ const LINKS = [
   { name: "CAE Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/CAE_Day5.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
 
   { name: "Draft EROs", url: "https://origin.wpc.ncep.noaa.gov/colqpf/ero_collab.shtml", category: "Maps & Analysis", parent: "wpc" },
+
+  // Live ERO status — id has no url, colored dots fill in via ERO_OUTLOOK_TARGETS below
+  { id: "georgia-ero-outlook", name: "Georgia ERO Outlooks", category: "Maps & Analysis",
+    status: [
+      { name: "Clarke County", label: "…", color: "var(--status-none)", dn: -1 },
+      { name: "Cobb County", label: "…", color: "var(--status-none)", dn: -1 },
+      { name: "Richmond County", label: "…", color: "var(--status-none)", dn: -1 },
+    ] },
+  { name: "GA Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day1.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
+  { name: "GA Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day2.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
+  { name: "GA Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day3.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
+  { name: "GA Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day4.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
+  { name: "GA Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day5.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
+
+  { id: "ilm-ero-outlook", name: "ILM ERO Outlooks", category: "Maps & Analysis",
+    status: [{ name: "New Hanover County, NC", label: "…", color: "var(--status-none)", dn: -1 }] },
+  { name: "ILM Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day1.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day2.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day3.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day4.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day5.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
 
   // --- Sunrise & Sunset Tables ---
   { name: "Create a Table", url: "https://aa.usno.navy.mil/data/RS_OneYear", category: "Sunrise & Sunset Tables" },
@@ -853,6 +874,16 @@ function groupCardHTML(item, query){
   const initial = item.name.trim()[0]?.toUpperCase() || '?';
   const fav = item.url ? faviconFor(item.url) : '';
 
+  const entries = item.status ? (Array.isArray(item.status) ? item.status : [item.status]) : null;
+  const hasStatus = !!entries && entries.length > 0;
+  const cardStyleAttr = hasStatus ? `style="--status-color:${worstStatusEntry(entries).color}"` : '';
+  const statusHTML = hasStatus
+    ? entries.map(e => `
+        <div class="card-status" style="--status-color:${e.color}">
+          <span class="status-dot"></span>${entries.length > 1 ? `${e.name}: ` : ''}${e.label}
+        </div>`).join('')
+    : '';
+
   const inner = `
     <span class="favicon">
       ${fav ? `<img src="${fav}" alt="" loading="lazy" onerror="this.remove()">` : ''}
@@ -860,6 +891,7 @@ function groupCardHTML(item, query){
     </span>
     <span class="card-text">
       <div class="card-name">${item.name}<span class="group-count">${children.length}</span></div>
+      ${statusHTML}
     </span>`;
 
   const head = item.url
@@ -867,7 +899,7 @@ function groupCardHTML(item, query){
     : `<span class="group-link group-label">${inner}</span>`;
 
   return `
-    <div class="card group-card ${isExpanded ? 'expanded' : ''}">
+    <div class="card group-card ${hasStatus ? 'has-status' : ''} ${isExpanded ? 'expanded' : ''}" ${cardStyleAttr}>
       <div class="group-head">
         ${head}
         <button class="group-toggle" data-group="${item.id}" aria-expanded="${isExpanded}" aria-label="Toggle ${item.name} sub-links">${chevronSVG}</button>
@@ -1319,76 +1351,99 @@ const RICHMOND_RING = [[-82.028238, 33.544934], [-82.014293, 33.530313], [-82.00
 // Which LINKS entry (by id) shows the live status for which named county/counties.
 // Each region is fetched separately so its status can be shown on its own line —
 // e.g. Georgia shows Clarke, Cobb, and Richmond each individually.
-const LIVE_OUTLOOK_TARGETS = [
-  { linkId: 'carolinas-outlook', regions: [{ name: 'New Hanover County, NC', ring: NHC_RING }] },
-  { linkId: 'georgia-outlook', regions: [
-      { name: 'Clarke County', ring: CLARKE_RING },
-      { name: 'Cobb County', ring: COBB_RING },
-      { name: 'Richmond County', ring: RICHMOND_RING },
-    ] },
+// Each "feed" is one ArcGIS map service layer (SPC convective outlook, WPC
+// excessive rainfall outlook, etc.) with its own dn->label/color mapping.
+// Each feed drives one or more LINKS entries (by id), each checking one or
+// more county shapes and showing the worst match per county.
+const OUTLOOK_FEEDS = [
+  {
+    // SPC Day 1 Categorical Convective Outlook
+    layerUrl: 'https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1',
+    categoryMap: {
+      2: { label: 'TSTM', color: 'var(--status-tstm)' },
+      3: { label: 'MRGL', color: 'var(--status-mrgl)' },
+      4: { label: 'SLGT', color: 'var(--status-slgt)' },
+      5: { label: 'ENH',  color: 'var(--status-enh)'  },
+      6: { label: 'MDT',  color: 'var(--status-mdt)'  },
+      8: { label: 'HIGH', color: 'var(--status-high)' },
+    },
+    targets: [
+      { linkId: 'carolinas-outlook', regions: [{ name: 'New Hanover County, NC', ring: NHC_RING }] },
+      { linkId: 'georgia-outlook', regions: [
+          { name: 'Clarke County', ring: CLARKE_RING },
+          { name: 'Cobb County', ring: COBB_RING },
+          { name: 'Richmond County', ring: RICHMOND_RING },
+        ] },
+    ],
+  },
+  {
+    // WPC Day 1 Excessive Rainfall Outlook
+    layerUrl: 'https://mapservices.weather.noaa.gov/vector/rest/services/hazards/wpc_precip_hazards/MapServer/0',
+    categoryMap: {
+      1: { label: 'MRGL', color: 'var(--status-mrgl)' },
+      2: { label: 'SLGT', color: 'var(--status-slgt)' },
+      3: { label: 'MDT',  color: 'var(--status-mdt)'  },
+      4: { label: 'HIGH', color: 'var(--status-high)' },
+    },
+    targets: [
+      { linkId: 'georgia-ero-outlook', regions: [
+          { name: 'Clarke County', ring: CLARKE_RING },
+          { name: 'Cobb County', ring: COBB_RING },
+          { name: 'Richmond County', ring: RICHMOND_RING },
+        ] },
+      { linkId: 'ilm-ero-outlook', regions: [{ name: 'New Hanover County, NC', ring: NHC_RING }] },
+    ],
+  },
 ];
 
-// SPC's "dn" field ranks severity — higher number = higher risk.
-// We ask NOAA's own map service which polygons intersect a given county
-// shape (server does the geometry math), then take the highest dn returned.
-const SPC_CATEGORY_MAP = {
-  2: { label: 'TSTM', color: 'var(--status-tstm)' },
-  3: { label: 'MRGL', color: 'var(--status-mrgl)' },
-  4: { label: 'SLGT', color: 'var(--status-slgt)' },
-  5: { label: 'ENH',  color: 'var(--status-enh)'  },
-  6: { label: 'MDT',  color: 'var(--status-mdt)'  },
-  8: { label: 'HIGH', color: 'var(--status-high)' },
-};
-
-async function fetchSpcOutlookForRings(rings){
+// Generic ArcGIS spatial-intersect query — NOAA's map service does the geometry
+// math server-side; we just ask "which polygons touch this county shape?" and
+// take the highest "dn" (severity rank) returned.
+async function fetchArcgisOutlookForRings(layerUrl, rings){
   const params = new URLSearchParams({
     f: 'geojson',
     where: '1=1',
-    outFields: 'dn,label,label2,valid,expire,issue',
+    outFields: 'dn,label,label2,valid,expire,issue,outlook,product',
     geometry: JSON.stringify({ rings }),
     geometryType: 'esriGeometryPolygon',
     spatialRel: 'esriSpatialRelIntersects',
     inSR: '4326',
     outSR: '4326',
   });
-  const url = `https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query?${params}`;
+  const url = `${layerUrl}/query?${params}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`SPC service responded ${res.status}`);
+  if (!res.ok) throw new Error(`Outlook service responded ${res.status}`);
   const data = await res.json();
-  if (data.error) throw new Error(data.error.message || 'SPC service returned an error');
+  if (data.error) throw new Error(data.error.message || 'Outlook service returned an error');
   return data.features || [];
 }
 
-async function fetchStatusForRegion(region){
+async function fetchStatusForRegion(region, layerUrl, categoryMap){
   try {
-    const features = await fetchSpcOutlookForRings([region.ring]);
+    const features = await fetchArcgisOutlookForRings(layerUrl, [region.ring]);
     if (features.length === 0){
       return { name: region.name, label: 'NONE', color: 'var(--status-none)', dn: -1 };
     }
     const top = features.reduce((max, f) => (f.properties.dn > max.properties.dn ? f : max));
-    const info = SPC_CATEGORY_MAP[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
+    const info = categoryMap[top.properties.dn] || { label: top.properties.label || '?', color: 'var(--accent)' };
     return { name: region.name, label: info.label, color: info.color, dn: top.properties.dn };
   } catch (err){
-    console.error(`SPC outlook fetch failed for ${region.name}:`, err);
+    console.error(`Outlook fetch failed for ${region.name}:`, err);
     return { name: region.name, label: 'N/A', color: 'var(--text-faint)', dn: -2 };
   }
 }
 
-async function updateOneOutlookTarget(target){
+async function updateOneOutlookTarget(target, layerUrl, categoryMap){
   const link = LINKS.find(l => l.id === target.linkId);
   if (!link) return;
-  link.status = await Promise.all(target.regions.map(fetchStatusForRegion));
+  link.status = await Promise.all(target.regions.map(r => fetchStatusForRegion(r, layerUrl, categoryMap)));
 }
 
 async function updateLiveOutlooks(){
-  const refreshBtn = document.getElementById('spc-refresh');
-  const updatedEl = document.getElementById('spc-updated');
-  if (refreshBtn) refreshBtn.disabled = true;
-
-  await Promise.all(LIVE_OUTLOOK_TARGETS.map(updateOneOutlookTarget));
-
-  if (updatedEl) updatedEl.textContent = `updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  if (refreshBtn) refreshBtn.disabled = false;
+  const allTargets = OUTLOOK_FEEDS.flatMap(feed =>
+    feed.targets.map(target => updateOneOutlookTarget(target, feed.layerUrl, feed.categoryMap))
+  );
+  await Promise.all(allTargets);
   render();
 }
 
