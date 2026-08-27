@@ -612,6 +612,38 @@ const LINKS = [
       { name: "Richmond County", label: "…", color: "var(--status-none)", dn: -1 },
     ] },
 
+  // Weather Prediction Center (WPC) — three levels deep: WPC -> ERO by State/CWA (labels) -> per-day maps
+  { id: "wpc", name: "Weather Prediction Center (WPC)", url: "https://www.wpc.ncep.noaa.gov/#page=ovw", category: "Maps & Analysis" },
+  { name: "Surface Analysis", url: "https://www.wpc.ncep.noaa.gov/#page=sfc", category: "Maps & Analysis", parent: "wpc" },
+  { name: "Fronts", url: "https://www.wpc.ncep.noaa.gov/#page=frt", category: "Maps & Analysis", parent: "wpc" },
+  { name: "QPF", url: "https://www.wpc.ncep.noaa.gov/#page=qpf", category: "Maps & Analysis", parent: "wpc" },
+
+  { id: "ero-by-state", name: "ERO by State", category: "Maps & Analysis", parent: "wpc" }, // no url = label only
+  { name: "SC Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day1.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "SC Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day2.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "SC Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day3.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "SC Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day4.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "SC Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/SC_Day5.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "NC Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/NC_Day1.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "NC Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/NC_Day2.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "NC Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/NC_Day3.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "NC Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/NC_Day4.png", category: "Maps & Analysis", parent: "ero-by-state" },
+  { name: "NC Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/NC_Day5.png", category: "Maps & Analysis", parent: "ero-by-state" },
+
+  { id: "ero-by-cwa", name: "ERO by CWA", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/", category: "Maps & Analysis", parent: "wpc" },
+  { name: "FFC Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/FFC_Day1.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "FFC Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/FFC_Day2.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "FFC Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/FFC_Day3.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "FFC Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/FFC_Day4.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "FFC Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/FFC_Day5.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "CAE Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/CAE_Day1.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "CAE Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/CAE_Day2.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "CAE Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/CAE_Day3.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "CAE Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/CAE_Day4.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+  { name: "CAE Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/CAE_Day5.png", category: "Maps & Analysis", parent: "ero-by-cwa" },
+
+  { name: "Draft EROs", url: "https://origin.wpc.ncep.noaa.gov/colqpf/ero_collab.shtml", category: "Maps & Analysis", parent: "wpc" },
+
   // --- Sunrise & Sunset Tables ---
   { name: "Create a Table", url: "https://aa.usno.navy.mil/data/RS_OneYear", category: "Sunrise & Sunset Tables" },
   { id: "sunset-2026", name: "2026 Tables (Z Time)", category: "Sunrise & Sunset Tables" }, // no url = label only
