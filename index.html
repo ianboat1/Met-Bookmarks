@@ -571,13 +571,12 @@ const LINKS = [
   { name: "NDBC Buoy Data", url: "https://ndbc.noaa.gov", category: "Marine & Surf" },
 
   // --- Hydrology ---
-  { name: "USGS Water Data", url: "https://waterdata.usgs.gov", category: "Hydrology" },
-  { name: "NWS River Forecast", url: "https://water.weather.gov", category: "Hydrology" },
-
-  // 3-level nesting example: label-only parent -> station (link) -> live data (link)
-  { id: "nwps", name: "NWPS Hydrographs", category: "Hydrology" }, // no url = organizational label only
-  { id: "wlon7", name: "Cape Fear River at Wilmington (WLON7)", url: "https://water.noaa.gov/gauges/WLON7", category: "Hydrology", parent: "nwps" },
-  { name: "Preliminary Live Data", url: "https://water.noaa.gov/gauges/WLON7?tab=observations", category: "Hydrology", parent: "wlon7" },
+  { name: "WaterView", url: "https://arcgis.com/apps/dashboards/82b0628d6747498e968d0e19ee326ab5", category: "Hydrology" },
+  { name: "National Water Prediction Service (NWPS)", url: "https://water.noaa.gov/", category: "Hydrology" },
+  { name: "FEMA Flood Maps", url: "https://msc.fema.gov/portal/home", category: "Hydrology" },
+  { name: "NCEM Flood Risk Information System (FRIS)", url: "https://fris.nc.gov/", category: "Hydrology" },
+  { name: "ILM River Monitor (RiverMon)", url: "https://www.weather.gov/ilm/rivermon", category: "Hydrology" },
+  { name: "Iowa State River Flooding Summary", url: "https://mesonet.agron.iastate.edu/river/?wfo=ILM", category: "Hydrology" },
 
   // --- Weather & Alerts ---
   { name: "NWS Local Forecast", url: "https://forecast.weather.gov", category: "Weather & Alerts" },
