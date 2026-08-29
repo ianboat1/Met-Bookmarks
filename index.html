@@ -681,25 +681,25 @@ const LINKS = [
   { name: "Draft EROs", url: "https://origin.wpc.ncep.noaa.gov/colqpf/ero_collab.shtml", category: "Maps & Analysis", parent: "wpc" },
 
   // Live ERO status — id has no url, colored dots fill in via ERO_OUTLOOK_TARGETS below
+  { name: "ILM Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day1.png", category: "Maps & Analysis" },
+  { id: "ilm-ero-outlook", name: "ILM ERO Outlooks", category: "Maps & Analysis",
+    status: [{ name: "New Hanover County, NC", label: "…", color: "var(--status-none)", dn: -1 }] },
+  { name: "ILM Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day2.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day3.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day4.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+  { name: "ILM Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day5.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
+
+  { name: "GA Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day1.png", category: "Maps & Analysis" },
   { id: "georgia-ero-outlook", name: "Georgia ERO Outlooks", category: "Maps & Analysis",
     status: [
       { name: "Clarke County", label: "…", color: "var(--status-none)", dn: -1 },
       { name: "Cobb County", label: "…", color: "var(--status-none)", dn: -1 },
       { name: "Richmond County", label: "…", color: "var(--status-none)", dn: -1 },
     ] },
-  { name: "GA Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day1.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
   { name: "GA Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day2.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
   { name: "GA Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day3.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
   { name: "GA Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day4.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
   { name: "GA Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/statemaps/GA_Day5.png", category: "Maps & Analysis", parent: "georgia-ero-outlook" },
-
-  { id: "ilm-ero-outlook", name: "ILM ERO Outlooks", category: "Maps & Analysis",
-    status: [{ name: "New Hanover County, NC", label: "…", color: "var(--status-none)", dn: -1 }] },
-  { name: "ILM Day 1", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day1.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
-  { name: "ILM Day 2", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day2.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
-  { name: "ILM Day 3", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day3.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
-  { name: "ILM Day 4", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day4.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
-  { name: "ILM Day 5", url: "https://www.wpc.ncep.noaa.gov/exper/eromap/cwamaps/ILM_Day5.png", category: "Maps & Analysis", parent: "ilm-ero-outlook" },
 
   { name: "National Hurricane Center (NHC)", url: "https://www.nhc.noaa.gov/", category: "Maps & Analysis" },
   { name: "Climate Prediction Center (CPC)", url: "https://www.cpc.ncep.noaa.gov/", category: "Maps & Analysis" },
