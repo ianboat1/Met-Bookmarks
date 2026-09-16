@@ -1350,14 +1350,18 @@ function renderTideChart(el, curve, hiLo, startParts, thresholds, caption){
     <div class="tide-caption">${caption}</div>
   `;
 
-  activeTideCharts[el.id] = { curve, xScale, yScale, nowLineId, nowDotId };
+  activeTideCharts[el.id] = {
+    nowLineId, nowDotId,
+    computeNowPosition: () => {
+      const m = easternMinutesOfDay(new Date());
+      return { x: xScale(m), y: yScale(interpolateTideValue(curve, m)) };
+    },
+  };
 }
 
 function moveTideNowMarkers(){
-  Object.values(activeTideCharts).forEach(({ curve, xScale, yScale, nowLineId, nowDotId }) => {
-    const nowMinutes = easternMinutesOfDay(new Date());
-    const x = xScale(nowMinutes);
-    const y = yScale(interpolateTideValue(curve, nowMinutes));
+  Object.values(activeTideCharts).forEach(({ nowLineId, nowDotId, computeNowPosition }) => {
+    const { x, y } = computeNowPosition();
     const line = document.getElementById(nowLineId);
     const dot = document.getElementById(nowDotId);
     if (line){ line.setAttribute('x1', x.toFixed(1)); line.setAttribute('x2', x.toFixed(1)); }
@@ -1374,17 +1378,6 @@ const TIDE_STATIONS = [
       { name: 'Action Stage', value: 5.5, color: 'var(--status-slgt)', cls: 'flood-action' },
       { name: 'Minor Flooding', value: 6.0, color: 'var(--status-enh)', cls: 'flood-minor' },
       { name: 'Moderate Flooding', value: 8.0, color: 'var(--status-mdt)', cls: 'flood-moderate' },
-      { name: 'Major Flooding', value: 10.0, color: 'var(--status-high)', cls: 'flood-major' },
-    ],
-  },
-  {
-    id: '8658120',
-    elId: 'tide-chart-wilm',
-    caption: 'Cape Fear River - Wilmington, NC',
-    thresholds: [
-      { name: 'Action Stage', value: 5.0, color: 'var(--status-slgt)', cls: 'flood-action' },
-      { name: 'Minor Flooding', value: 5.5, color: 'var(--status-enh)', cls: 'flood-minor' },
-      { name: 'Moderate Flooding', value: 6.75, color: 'var(--status-mdt)', cls: 'flood-moderate' },
       { name: 'Major Flooding', value: 10.0, color: 'var(--status-high)', cls: 'flood-major' },
     ],
   },
@@ -1418,6 +1411,198 @@ function updateAllTideDisplays(){
 updateAllTideDisplays();
 setInterval(updateAllTideDisplays, 60 * 60 * 1000); // rolls the range forward each hour so "tomorrow" keeps advancing
 setInterval(moveTideNowMarkers, 60 * 1000); // reposition each "now" marker every minute without refetching
+
+/* ---------- Wilmington, NC river hydrograph (Cape Fear River, gauge WLON7) ----------
+   Sourced from NOAA's National Water Prediction Service (NWPS) API — the same
+   official observed + forecast stage data shown on the gauge's own forecast
+   hydrograph page (water.noaa.gov/gauges/WLON7), not astronomical tide
+   predictions. Flood category thresholds (Action/Minor/Moderate/Major) are
+   pulled live from the gauge's own NWPS metadata rather than hardcoded,
+   since the hydrograph's stage datum doesn't necessarily match the MLLW
+   tide datum used by the Wrightsville chart. */
+const WLON7_CAPTION = 'Cape Fear River - Wilmington, NC (WLON7 Forecast Hydrograph)';
+
+async function fetchNwpsGaugeMeta(gaugeId){
+  const res = await fetch(`https://api.water.noaa.gov/nwps/v1/gauges/${gaugeId}`);
+  if (!res.ok) throw new Error(`NWPS gauge metadata responded ${res.status}`);
+  return res.json();
+}
+
+async function fetchNwpsStageflow(gaugeId, kind){
+  const res = await fetch(`https://api.water.noaa.gov/nwps/v1/gauges/${gaugeId}/stageflow/${kind}`);
+  if (!res.ok) throw new Error(`NWPS ${kind} stageflow responded ${res.status}`);
+  return res.json();
+}
+
+function parseNwpsPoints(payload){
+  const rows = (payload && payload.data) || [];
+  return rows
+    .map(r => ({
+      time: new Date(r.validTime),
+      stage: (typeof r.primary === 'number' && Number.isFinite(r.primary) && r.primary > -900) ? r.primary : null,
+    }))
+    .filter(p => p.stage !== null && !isNaN(p.time.getTime()))
+    .sort((a, b) => a.time - b.time);
+}
+
+function nwpsFloodThresholds(meta){
+  const cats = meta && meta.flood && meta.flood.categories;
+  const defs = [
+    { key: 'action', name: 'Action Stage', color: 'var(--status-slgt)', cls: 'flood-action' },
+    { key: 'minor', name: 'Minor Flooding', color: 'var(--status-enh)', cls: 'flood-minor' },
+    { key: 'moderate', name: 'Moderate Flooding', color: 'var(--status-mdt)', cls: 'flood-moderate' },
+    { key: 'major', name: 'Major Flooding', color: 'var(--status-high)', cls: 'flood-major' },
+  ];
+  return defs
+    .map(d => {
+      const stage = cats && cats[d.key] && typeof cats[d.key].stage === 'number' ? cats[d.key].stage : null;
+      return stage !== null ? { name: d.name, value: stage, color: d.color, cls: d.cls } : null;
+    })
+    .filter(Boolean);
+}
+
+function interpolateByTime(points, targetMs){
+  for (let i = 0; i < points.length - 1; i++){
+    const t1 = points[i].time.getTime(), t2 = points[i + 1].time.getTime();
+    if (targetMs >= t1 && targetMs <= t2){
+      const frac = (targetMs - t1) / (t2 - t1 || 1);
+      return points[i].stage + frac * (points[i + 1].stage - points[i].stage);
+    }
+  }
+  return points[points.length - 1].stage;
+}
+
+function renderHydrographChart(el, points, observedCount, thresholds, caption){
+  const nowLineId = `tide-now-line-${el.id}`;
+  const nowDotId = `tide-now-dot-${el.id}`;
+  const W = 760, H = 280, padTop = 76, padBottom = 84, padX = 10;
+  const plotH = H - padTop - padBottom;
+  const baseline = padTop + plotH;
+
+  const t0 = points[0].time.getTime();
+  const tN = points[points.length - 1].time.getTime();
+  const spanT = (tN - t0) || 1;
+
+  const values = points.map(p => p.stage);
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const spanV = (maxV - minV) || 1;
+
+  const xScale = t => padX + ((t - t0) / spanT) * (W - 2 * padX);
+  const yScale = v => padTop + (1 - (v - minV) / spanV) * plotH;
+  const pathFor = pts => 'M' + pts.map(p => `${xScale(p.time.getTime()).toFixed(1)},${yScale(p.stage).toFixed(1)}`).join(' L');
+
+  const boundaryIndex = Math.max(observedCount - 1, 0);
+  const observedPts = points.slice(0, observedCount);
+  const forecastPts = points.slice(boundaryIndex); // shares the boundary point for a continuous join
+
+  const observedLineD = observedPts.length ? pathFor(observedPts) : '';
+  const forecastLineD = forecastPts.length > 1 ? pathFor(forecastPts) : '';
+  const areaD = `${pathFor(points)} L${xScale(tN).toFixed(1)},${baseline} L${xScale(t0).toFixed(1)},${baseline} Z`;
+  const fillId = `tideFill-${el.id}`;
+
+  // Single most important marker: the highest stage across the whole visible window.
+  const crest = points.reduce((max, p) => (p.stage > max.stage ? p : max));
+  const crestIsForecast = crest.time.getTime() >= points[boundaryIndex].time.getTime();
+  const flood = floodThresholdFor(crest.stage, thresholds);
+  const cx = xScale(crest.time.getTime());
+  const cy = yScale(crest.stage);
+  const crestColor = flood ? flood.color : 'var(--accent)';
+  const crestClass = flood ? flood.cls : '';
+  const crestLabel = flood ? flood.name : (crestIsForecast ? 'Forecast Crest' : 'Observed Crest');
+  const crestTimeStr = crest.time.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+  // Flip the label above/below the dot depending on how close the crest sits to the top of the plot.
+  const placeBelow = (cy - padTop) < 60;
+  const tagY = placeBelow ? cy + 16 : cy - 40;
+  const timeY = placeBelow ? cy + 30 : cy - 26;
+  const heightY = placeBelow ? cy + 44 : cy - 10;
+  const crestMarkerHTML = `
+    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="none" stroke="${crestColor}" stroke-width="1.5" />
+    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="${crestColor}" />
+    <text x="${cx.toFixed(1)}" y="${tagY.toFixed(1)}" text-anchor="middle" class="tide-chart-flood-tag ${crestClass}" style="${flood ? '' : 'fill:var(--accent)'}">${crestLabel}</text>
+    <text x="${cx.toFixed(1)}" y="${timeY.toFixed(1)}" text-anchor="middle" class="tide-chart-label ${crestClass}">${crestTimeStr}</text>
+    <text x="${cx.toFixed(1)}" y="${heightY.toFixed(1)}" text-anchor="middle" class="tide-chart-label height ${crestClass}">${crest.stage.toFixed(2)} ft</text>
+  `;
+
+  // OBSERVED / FORECAST section labels, centered over each portion.
+  const obsMidT = observedPts.length ? (observedPts[0].time.getTime() + observedPts[observedPts.length - 1].time.getTime()) / 2 : null;
+  const fcMidT = forecastPts.length > 1 ? (forecastPts[0].time.getTime() + forecastPts[forecastPts.length - 1].time.getTime()) / 2 : null;
+  const sectionLabelsHTML = `
+    ${obsMidT !== null ? `<text x="${xScale(obsMidT).toFixed(1)}" y="18" text-anchor="middle" class="tide-chart-section-label">OBSERVED</text>` : ''}
+    ${fcMidT !== null ? `<text x="${xScale(fcMidT).toFixed(1)}" y="18" text-anchor="middle" class="tide-chart-section-label">FORECAST</text>` : ''}
+  `;
+
+  // Divider marking the observed/forecast boundary, labeled with that date.
+  const boundaryPoint = points[boundaryIndex];
+  const boundaryX = xScale(boundaryPoint.time.getTime());
+  const boundaryLabel = boundaryPoint.time.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
+  const dividerHTML = (observedPts.length > 0 && forecastPts.length > 1) ? `
+    <line x1="${boundaryX.toFixed(1)}" y1="${padTop}" x2="${boundaryX.toFixed(1)}" y2="${baseline}" stroke="var(--border-hover)" stroke-width="1" stroke-dasharray="3,3" />
+    <text x="${boundaryX.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="tide-chart-label">${boundaryLabel}</text>
+  ` : '';
+
+  const clampedNowMs = Math.min(Math.max(Date.now(), t0), tN);
+  const nowX = xScale(clampedNowMs);
+  const nowY = yScale(interpolateByTime(points, clampedNowMs));
+
+  el.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" class="tide-chart-svg" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35" />
+          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#${fillId})" stroke="none" />
+      ${observedLineD ? `<path d="${observedLineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />` : ''}
+      ${forecastLineD ? `<path d="${forecastLineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round" />` : ''}
+      ${dividerHTML}
+      ${sectionLabelsHTML}
+      ${crestMarkerHTML}
+      <line id="${nowLineId}" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
+      <circle id="${nowDotId}" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
+    </svg>
+    <div class="tide-caption">${caption}</div>
+  `;
+
+  activeTideCharts[el.id] = {
+    nowLineId, nowDotId,
+    computeNowPosition: () => {
+      const clamped = Math.min(Math.max(Date.now(), t0), tN);
+      return { x: xScale(clamped), y: yScale(interpolateByTime(points, clamped)) };
+    },
+  };
+}
+
+async function updateWilmingtonHydrograph(){
+  const chartEl = document.getElementById('tide-chart-wilm');
+  if (!chartEl) return;
+  try {
+    const [meta, observedRaw, forecastRaw] = await Promise.all([
+      fetchNwpsGaugeMeta('WLON7'),
+      fetchNwpsStageflow('WLON7', 'observed'),
+      fetchNwpsStageflow('WLON7', 'forecast').catch(() => null), // forecast isn't published for every gauge
+    ]);
+
+    const observed = parseNwpsPoints(observedRaw);
+    const forecast = forecastRaw ? parseNwpsPoints(forecastRaw) : [];
+    const forecastOnly = forecast.filter(f => !observed.some(o => o.time.getTime() === f.time.getTime()));
+    const merged = [...observed, ...forecastOnly].sort((a, b) => a.time - b.time);
+
+    if (merged.length === 0){
+      chartEl.innerHTML = '';
+      return;
+    }
+
+    renderHydrographChart(chartEl, merged, observed.length, nwpsFloodThresholds(meta), WLON7_CAPTION);
+  } catch (err){
+    chartEl.innerHTML = '';
+    console.error('Wilmington hydrograph fetch failed:', err);
+  }
+}
+updateWilmingtonHydrograph();
+setInterval(updateWilmingtonHydrograph, 15 * 60 * 1000); // NWPS observed/forecast data refreshes several times a day
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
    Each county's boundary is real US Census TIGER data, small/simple
