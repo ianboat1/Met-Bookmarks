@@ -1505,29 +1505,84 @@ function renderHydrographChart(el, points, thresholds, caption){
   const areaD = `${pathFor(points)} L${xScale(tN).toFixed(1)},${baseline} L${xScale(t0).toFixed(1)},${baseline} Z`;
   const fillId = `tideFill-${el.id}`;
 
-  // Single most important marker: the highest stage across the whole visible window.
-  const crest = points.reduce((max, p) => (p.stage > max.stage ? p : max));
-  const crestIsForecast = !crest.isObserved;
-  const flood = floodThresholdFor(crest.stage, thresholds);
-  const cx = xScale(crest.time.getTime());
-  const cy = yScale(crest.stage);
-  const crestColor = flood ? flood.color : 'var(--accent)';
-  const crestClass = flood ? flood.cls : '';
-  const crestLabel = flood ? flood.name : (crestIsForecast ? 'Forecast Crest' : 'Observed Crest');
-  const crestTimeStr = crest.time.toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+// Find local highs and lows in a stage series. Unlike the CO-OPS tide API, the
+// NWPS hydrograph doesn't publish hi/lo events, so we detect turning points
+// ourselves. A point qualifies if it's the most extreme value within a window
+// of +/- halfWindowMs around it — comparing against immediate neighbors alone
+// fails on dense data, where consecutive readings differ by almost nothing.
+function findLocalExtrema(points, { halfWindowMs = 3 * 60 * 60 * 1000, minProminence = 0.2 } = {}){
+  if (points.length < 3) return [];
+  const candidates = [];
 
-  // Flip the label above/below the dot depending on how close the crest sits to the top of the plot.
-  const placeBelow = (cy - padTop) < 60;
-  const tagY = placeBelow ? cy + 16 : cy - 40;
-  const timeY = placeBelow ? cy + 30 : cy - 26;
-  const heightY = placeBelow ? cy + 44 : cy - 10;
-  const crestMarkerHTML = `
-    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="6" fill="none" stroke="${crestColor}" stroke-width="1.5" />
-    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5" fill="${crestColor}" />
-    <text x="${cx.toFixed(1)}" y="${tagY.toFixed(1)}" text-anchor="middle" class="tide-chart-flood-tag ${crestClass}" style="${flood ? '' : 'fill:var(--accent)'}">${crestLabel}</text>
-    <text x="${cx.toFixed(1)}" y="${timeY.toFixed(1)}" text-anchor="middle" class="tide-chart-label ${crestClass}">${crestTimeStr}</text>
-    <text x="${cx.toFixed(1)}" y="${heightY.toFixed(1)}" text-anchor="middle" class="tide-chart-label height ${crestClass}">${crest.stage.toFixed(2)} ft</text>
+  for (let i = 0; i < points.length; i++){
+    const t = points[i].time.getTime();
+    const cur = points[i].stage;
+
+    let lo = cur, hi = cur, beforeCount = 0, afterCount = 0;
+    for (let j = 0; j < points.length; j++){
+      if (j === i) continue;
+      const dt = points[j].time.getTime() - t;
+      if (Math.abs(dt) > halfWindowMs) continue;
+      if (dt < 0) beforeCount++; else afterCount++;
+      if (points[j].stage < lo) lo = points[j].stage;
+      if (points[j].stage > hi) hi = points[j].stage;
+    }
+    // Needs real context on both sides — otherwise the first/last points of the
+    // series look like turns simply because the data stops there.
+    if (beforeCount < 2 || afterCount < 2) continue;
+
+    const isHigh = cur >= hi;
+    const isLow = cur <= lo;
+    if (isHigh === isLow) continue; // flat window, or both -> not a turning point
+
+    const prominence = isHigh ? cur - lo : hi - cur;
+    if (prominence < minProminence) continue;
+
+    candidates.push({ ...points[i], type: isHigh ? 'H' : 'L', prominence });
+  }
+
+  // Collapse flat-topped turns (several readings tie at the peak) into one marker.
+  const deduped = [];
+  for (const c of candidates){
+    const last = deduped[deduped.length - 1];
+    if (last && last.type === c.type && (c.time.getTime() - last.time.getTime()) <= halfWindowMs){
+      if ((c.type === 'H' && c.stage > last.stage) || (c.type === 'L' && c.stage < last.stage)){
+        deduped[deduped.length - 1] = c;
+      }
+    } else {
+      deduped.push(c);
+    }
+  }
+  return deduped;
+}
+
+// Mark every high/low turning point. Highs get flood-threshold coloring when
+// they cross a stage category; lows are always neutral.
+const extrema = findLocalExtrema(points);
+const markersHTML = extrema.map(p => {
+  const isHigh = p.type === 'H';
+  const flood = isHigh ? floodThresholdFor(p.stage, thresholds) : null;
+  const x = xScale(p.time.getTime());
+  const y = yScale(p.stage);
+  const color = flood ? flood.color : (isHigh ? 'var(--accent)' : 'var(--text-muted)');
+  const cls = flood ? flood.cls : '';
+  const timeStr = p.time.toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
+
+  const timeY = isHigh ? y - 38 : y + 26;
+  const heightY = isHigh ? y - 20 : y + 44;
+  const ring = flood ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="none" stroke="${flood.color}" stroke-width="1.5" />` : '';
+  const stageTag = flood
+    ? `<text x="${x.toFixed(1)}" y="${(y - 54).toFixed(1)}" text-anchor="middle" class="tide-chart-flood-tag ${flood.cls}">${flood.name}</text>`
+    : '';
+
+  return `
+    ${ring}
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${color}" />
+    ${stageTag}
+    <text x="${x.toFixed(1)}" y="${timeY.toFixed(1)}" text-anchor="middle" class="tide-chart-label ${cls}">${timeStr}</text>
+    <text x="${x.toFixed(1)}" y="${heightY.toFixed(1)}" text-anchor="middle" class="tide-chart-label height ${cls}">${p.stage.toFixed(2)} ft</text>
   `;
+}).join('');
 
   // OBSERVED / FORECAST section labels, centered over each portion.
   const obsMidT = observedPts.length ? (observedPts[0].time.getTime() + observedPts[observedPts.length - 1].time.getTime()) / 2 : null;
@@ -1562,7 +1617,7 @@ function renderHydrographChart(el, points, thresholds, caption){
       ${forecastLineD ? `<path d="${forecastLineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round" />` : ''}
       ${dividerHTML}
       ${sectionLabelsHTML}
-      ${crestMarkerHTML}
+      ${markersHTML}
       <line id="${nowLineId}" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
       <circle id="${nowDotId}" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
     </svg>
