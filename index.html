@@ -1472,7 +1472,7 @@ function interpolateByTime(points, targetMs){
   return points[points.length - 1].stage;
 }
 
-function renderHydrographChart(el, points, observedCount, thresholds, caption){
+function renderHydrographChart(el, points, thresholds, caption){
   const nowLineId = `tide-now-line-${el.id}`;
   const nowDotId = `tide-now-dot-${el.id}`;
   const W = 760, H = 280, padTop = 76, padBottom = 84, padX = 10;
@@ -1492,9 +1492,13 @@ function renderHydrographChart(el, points, observedCount, thresholds, caption){
   const yScale = v => padTop + (1 - (v - minV) / spanV) * plotH;
   const pathFor = pts => 'M' + pts.map(p => `${xScale(p.time.getTime()).toFixed(1)},${yScale(p.stage).toFixed(1)}`).join(' L');
 
-  const boundaryIndex = Math.max(observedCount - 1, 0);
-  const observedPts = points.slice(0, observedCount);
-  const forecastPts = points.slice(boundaryIndex); // shares the boundary point for a continuous join
+  const observedPts = points.filter(p => p.isObserved);
+  const forecastOnlyPts = points.filter(p => !p.isObserved);
+  // Prepend the last observed point to the forecast line so they join without a visual gap.
+  const forecastPts = (observedPts.length && forecastOnlyPts.length)
+    ? [observedPts[observedPts.length - 1], ...forecastOnlyPts]
+    : forecastOnlyPts;
+  const boundaryPoint = observedPts.length ? observedPts[observedPts.length - 1] : forecastPts[0];
 
   const observedLineD = observedPts.length ? pathFor(observedPts) : '';
   const forecastLineD = forecastPts.length > 1 ? pathFor(forecastPts) : '';
@@ -1503,7 +1507,7 @@ function renderHydrographChart(el, points, observedCount, thresholds, caption){
 
   // Single most important marker: the highest stage across the whole visible window.
   const crest = points.reduce((max, p) => (p.stage > max.stage ? p : max));
-  const crestIsForecast = crest.time.getTime() >= points[boundaryIndex].time.getTime();
+  const crestIsForecast = !crest.isObserved;
   const flood = floodThresholdFor(crest.stage, thresholds);
   const cx = xScale(crest.time.getTime());
   const cy = yScale(crest.stage);
@@ -1534,10 +1538,9 @@ function renderHydrographChart(el, points, observedCount, thresholds, caption){
   `;
 
   // Divider marking the observed/forecast boundary, labeled with that date.
-  const boundaryPoint = points[boundaryIndex];
   const boundaryX = xScale(boundaryPoint.time.getTime());
   const boundaryLabel = boundaryPoint.time.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
-  const dividerHTML = (observedPts.length > 0 && forecastPts.length > 1) ? `
+  const dividerHTML = (observedPts.length > 0 && forecastOnlyPts.length > 0) ? `
     <line x1="${boundaryX.toFixed(1)}" y1="${padTop}" x2="${boundaryX.toFixed(1)}" y2="${baseline}" stroke="var(--border-hover)" stroke-width="1" stroke-dasharray="3,3" />
     <text x="${boundaryX.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="tide-chart-label">${boundaryLabel}</text>
   ` : '';
@@ -1575,6 +1578,16 @@ function renderHydrographChart(el, points, observedCount, thresholds, caption){
   };
 }
 
+// Real-timestamp equivalent of the tide charts' "today/tomorrow" window —
+// keeps only points that fall on today's or tomorrow's Eastern calendar date.
+function easternDateParts(date){
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  return { y: parseInt(part(parts, 'year'), 10), m: parseInt(part(parts, 'month'), 10), d: parseInt(part(parts, 'day'), 10) };
+}
+function sameYmd(a, b){ return a.y === b.y && a.m === b.m && a.d === b.d; }
+
 async function updateWilmingtonHydrograph(){
   const chartEl = document.getElementById('tide-chart-wilm');
   if (!chartEl) return;
@@ -1585,17 +1598,27 @@ async function updateWilmingtonHydrograph(){
       fetchNwpsStageflow('WLON7', 'forecast').catch(() => null), // forecast isn't published for every gauge
     ]);
 
-    const observed = parseNwpsPoints(observedRaw);
-    const forecast = forecastRaw ? parseNwpsPoints(forecastRaw) : [];
+    const observed = parseNwpsPoints(observedRaw).map(p => ({ ...p, isObserved: true }));
+    const forecast = (forecastRaw ? parseNwpsPoints(forecastRaw) : []).map(p => ({ ...p, isObserved: false }));
     const forecastOnly = forecast.filter(f => !observed.some(o => o.time.getTime() === f.time.getTime()));
     const merged = [...observed, ...forecastOnly].sort((a, b) => a.time - b.time);
 
-    if (merged.length === 0){
+    // Window down to just today + tomorrow (Eastern) so the chart isn't
+    // squashing a week of tidal oscillation into a fixed-width plot.
+    const todayParts = easternTodayParts();
+    const tomorrowParts = addOneDay(todayParts);
+    const windowed = merged.filter(p => {
+      const d = easternDateParts(p.time);
+      return sameYmd(d, todayParts) || sameYmd(d, tomorrowParts);
+    });
+    const finalPoints = windowed.length > 0 ? windowed : merged; // fall back rather than show nothing
+
+    if (finalPoints.length === 0){
       chartEl.innerHTML = '';
       return;
     }
 
-    renderHydrographChart(chartEl, merged, observed.length, nwpsFloodThresholds(meta), WLON7_CAPTION);
+    renderHydrographChart(chartEl, finalPoints, nwpsFloodThresholds(meta), WLON7_CAPTION);
   } catch (err){
     chartEl.innerHTML = '';
     console.error('Wilmington hydrograph fetch failed:', err);
