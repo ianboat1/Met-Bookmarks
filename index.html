@@ -146,7 +146,7 @@
   .tide-chart-label.height{ fill: var(--text-muted); }
 
   /* Coastal flood threshold highlighting — reuses the same severity palette as SPC outlooks */
-  .tide-chart-label.flood-action{ fill: var(--status-slgt); }
+  .tide-chart-label.flood-action{ fill: var(--text); }
   .tide-chart-label.flood-minor{ fill: var(--status-enh); }
   .tide-chart-label.flood-moderate{ fill: var(--status-mdt); }
   .tide-chart-label.flood-major{ fill: var(--status-high); }
@@ -1189,68 +1189,17 @@ function ymdToApiDate({ y, m, d }){
   return `${y}${String(m).padStart(2, '0')}${String(d).padStart(2, '0')}`;
 }
 
-async function fetchTideRange(interval, stationId){
-  const todayParts = easternTodayParts();
-  const tomorrowParts = addOneDay(todayParts);
-  const params = new URLSearchParams({
-    begin_date: ymdToApiDate(todayParts),
-    end_date: ymdToApiDate(tomorrowParts),
-    station: stationId,
-    product: 'predictions',
-    datum: 'MLLW',
-    time_zone: 'lst_ldt',
-    units: 'english',
-    interval,
-    application: 'personal_bookmarks_dashboard',
-    format: 'json',
-  });
-  const url = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?${params}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Tides API responded ${res.status}`);
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message || 'Tides API returned an error');
-  return { predictions: data.predictions || [], startDate: todayParts };
-}
 
-function formatTideTime(t){
-  // t looks like "2026-08-25 03:12"
-  const [hStr, mStr] = t.split(' ')[1].split(':');
-  let hour = parseInt(hStr, 10);
-  const ampm = hour >= 12 ? 'PM' : 'AM';
-  hour = hour % 12 || 12;
-  return `${hour}:${mStr} ${ampm}`;
-}
+/* ---------- River/tidal forecast hydrographs (NWPS) ----------
+   Sourced from NOAA's National Water Prediction Service API — the same official
+   observed + forecast stage data shown on each gauge's own forecast hydrograph
+   page (water.noaa.gov/gauges/<ID>), not astronomical tide predictions.
+   Flood category thresholds (Action/Minor/Moderate/Major) are pulled live from
+   each gauge's own NWPS metadata rather than hardcoded, since each gauge's
+   stage datum differs. See HYDROGRAPH_STATIONS below for the gauges shown. */
 
-// Minutes since the *start* of the chart's first day (0–1439 = today, 1440–2879 = tomorrow),
-// computed from the full "YYYY-MM-DD HH:MM" timestamp so today/tomorrow don't collide.
-function minutesSinceStart(t, startParts){
-  const [datePart, timePart] = t.split(' ');
-  const [y, m, d] = datePart.split('-').map(Number);
-  const [hh, mm] = timePart.split(':').map(Number);
-  const dayOffset = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(startParts.y, startParts.m - 1, startParts.d)) / 86400000);
-  return dayOffset * 1440 + hh * 60 + mm;
-}
-
-function easternMinutesOfDay(date){
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false
-  }).formatToParts(date);
-  return (parseInt(part(parts, 'hour'), 10) % 24) * 60 + parseInt(part(parts, 'minute'), 10);
-}
-
-function interpolateTideValue(curve, minutes){
-  for (let i = 0; i < curve.length - 1; i++){
-    if (minutes >= curve[i].minutes && minutes <= curve[i + 1].minutes){
-      const t = (minutes - curve[i].minutes) / (curve[i + 1].minutes - curve[i].minutes);
-      return curve[i].v + t * (curve[i + 1].v - curve[i].v);
-    }
-  }
-  return curve[curve.length - 1].v;
-}
-
-// Coastal flood thresholds for high tide, worst-applicable stage wins per station.
-// Note: these are astronomical predictions only — no storm surge is factored in,
-// so this flags exceptional astronomical tides, not storm-driven flood events.
+// Coastal/river flood thresholds for a high point — the worst applicable stage
+// wins (a stage over Moderate is also over Action and Minor).
 function floodThresholdFor(v, thresholds){
   let matched = null;
   for (const t of thresholds){
@@ -1259,105 +1208,9 @@ function floodThresholdFor(v, thresholds){
   return matched;
 }
 
-// Each station tracks its own scale functions + curve so its "now" marker can
-// move every minute without refetching, keyed by DOM element id.
+// Each chart registers how to recompute its "now" marker, keyed by DOM element
+// id, so the marker can slide along the curve every minute without refetching.
 const activeTideCharts = {};
-
-function renderTideChart(el, curve, hiLo, startParts, thresholds, caption){
-  const nowLineId = `tide-now-line-${el.id}`;
-  const nowDotId = `tide-now-dot-${el.id}`;
-  const SPAN_MINUTES = 2880; // 48 hours
-  const W = 760, H = 280, padTop = 76, padBottom = 84, padX = 10;
-  const plotH = H - padTop - padBottom;
-  const baseline = padTop + plotH;
-  const values = curve.map(p => p.v);
-  const minV = Math.min(...values);
-  const maxV = Math.max(...values);
-  const spanV = (maxV - minV) || 1;
-
-  const xScale = m => padX + (m / SPAN_MINUTES) * (W - 2 * padX);
-  const yScale = v => padTop + (1 - (v - minV) / spanV) * plotH;
-
-  const lineD = 'M' + curve.map(p => `${xScale(p.minutes).toFixed(1)},${yScale(p.v).toFixed(1)}`).join(' L');
-  const areaD = `${lineD} L${xScale(curve[curve.length - 1].minutes).toFixed(1)},${baseline} L${xScale(curve[0].minutes).toFixed(1)},${baseline} Z`;
-  const fillId = `tideFill-${el.id}`;
-
-  // Every high/low gets its own two-line label (time, then height) instead of a
-  // separate pill row — highs label upward from the dot, lows label downward.
-  const markersHTML = hiLo.map(p => {
-    const minutes = minutesSinceStart(p.t, startParts);
-    const v = parseFloat(p.v);
-    const x = xScale(minutes);
-    const y = yScale(v);
-    const isHigh = p.type === 'H';
-    const timeY = isHigh ? y - 38 : y + 26;
-    const heightY = isHigh ? y - 20 : y + 44;
-    const flood = isHigh ? floodThresholdFor(v, thresholds) : null;
-
-    const dotFill = flood ? flood.color : (isHigh ? 'var(--accent)' : 'var(--text-muted)');
-    const ring = flood ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6" fill="none" stroke="${flood.color}" stroke-width="1.5" />` : '';
-    const timeClass = `tide-chart-label${flood ? ' ' + flood.cls : ''}`;
-    const heightClass = `tide-chart-label height${flood ? ' ' + flood.cls : ''}`;
-    const stageTag = flood
-      ? `<text x="${x.toFixed(1)}" y="${(y - 54).toFixed(1)}" text-anchor="middle" class="tide-chart-flood-tag ${flood.cls}">${flood.name}</text>`
-      : '';
-
-    return `
-      ${ring}
-      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${dotFill}" />
-      ${stageTag}
-      <text x="${x.toFixed(1)}" y="${timeY.toFixed(1)}" text-anchor="middle" class="${timeClass}">${formatTideTime(p.t)}</text>
-      <text x="${x.toFixed(1)}" y="${heightY.toFixed(1)}" text-anchor="middle" class="${heightClass}">${v.toFixed(2)} ft MLLW</text>
-    `;
-  }).join('');
-
-  // Today / Tomorrow section labels, up in the top margin.
-  const sectionLabelsHTML = `
-    <text x="${xScale(720).toFixed(1)}" y="18" text-anchor="middle" class="tide-chart-section-label">TODAY</text>
-    <text x="${xScale(2160).toFixed(1)}" y="18" text-anchor="middle" class="tide-chart-section-label">TOMORROW</text>
-  `;
-
-  // Divider marking the today/tomorrow boundary, with tomorrow's date labeled.
-  const tomorrowParts = addOneDay(startParts);
-  const boundaryX = xScale(1440);
-  const boundaryLabel = new Date(Date.UTC(tomorrowParts.y, tomorrowParts.m - 1, tomorrowParts.d))
-    .toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' });
-  const dividerHTML = `
-    <line x1="${boundaryX.toFixed(1)}" y1="${padTop}" x2="${boundaryX.toFixed(1)}" y2="${baseline}" stroke="var(--border-hover)" stroke-width="1" stroke-dasharray="3,3" />
-    <text x="${boundaryX.toFixed(1)}" y="${H - 6}" text-anchor="middle" class="tide-chart-label">${boundaryLabel}</text>
-  `;
-
-  const nowMinutes = easternMinutesOfDay(new Date());
-  const nowX = xScale(nowMinutes);
-  const nowY = yScale(interpolateTideValue(curve, nowMinutes));
-
-  el.innerHTML = `
-    <svg viewBox="0 0 ${W} ${H}" class="tide-chart-svg" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="${fillId}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.35" />
-          <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      <path d="${areaD}" fill="url(#${fillId})" stroke="none" />
-      <path d="${lineD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />
-      ${dividerHTML}
-      ${sectionLabelsHTML}
-      ${markersHTML}
-      <line id="${nowLineId}" x1="${nowX.toFixed(1)}" y1="${padTop}" x2="${nowX.toFixed(1)}" y2="${baseline}" stroke="var(--accent-warm)" stroke-width="1" stroke-dasharray="2,2" />
-      <circle id="${nowDotId}" cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="3.5" fill="var(--accent-warm)" />
-    </svg>
-    <div class="tide-caption">${caption}</div>
-  `;
-
-  activeTideCharts[el.id] = {
-    nowLineId, nowDotId,
-    computeNowPosition: () => {
-      const m = easternMinutesOfDay(new Date());
-      return { x: xScale(m), y: yScale(interpolateTideValue(curve, m)) };
-    },
-  };
-}
 
 function moveTideNowMarkers(){
   Object.values(activeTideCharts).forEach(({ nowLineId, nowDotId, computeNowPosition }) => {
@@ -1368,59 +1221,6 @@ function moveTideNowMarkers(){
     if (dot){ dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); }
   });
 }
-
-const TIDE_STATIONS = [
-  {
-    id: '8658163',
-    elId: 'tide-chart',
-    caption: 'Johnnie Mercers Fishing Pier - Wrightsville Beach, NC',
-    thresholds: [
-      { name: 'Action Stage', value: 5.5, color: 'var(--status-slgt)', cls: 'flood-action' },
-      { name: 'Minor Flooding', value: 6.0, color: 'var(--status-enh)', cls: 'flood-minor' },
-      { name: 'Moderate Flooding', value: 8.0, color: 'var(--status-mdt)', cls: 'flood-moderate' },
-      { name: 'Major Flooding', value: 10.0, color: 'var(--status-high)', cls: 'flood-major' },
-    ],
-  },
-];
-
-async function updateStationTideDisplay(station){
-  const chartEl = document.getElementById(station.elId);
-  if (!chartEl) return;
-  try {
-    const [hiLoResult, curveResult] = await Promise.all([
-      fetchTideRange('hilo', station.id),
-      fetchTideRange('6', station.id),
-    ]);
-    const { predictions: hiLo, startDate } = hiLoResult;
-    const curve = curveResult.predictions.map(p => ({ minutes: minutesSinceStart(p.t, startDate), v: parseFloat(p.v) }));
-
-    if (curve.length > 0){
-      renderTideChart(chartEl, curve, hiLo, startDate, station.thresholds, station.caption);
-    } else {
-      chartEl.innerHTML = '';
-    }
-  } catch (err){
-    chartEl.innerHTML = '';
-    console.error(`Tide data fetch failed for station ${station.id}:`, err);
-  }
-}
-
-function updateAllTideDisplays(){
-  TIDE_STATIONS.forEach(updateStationTideDisplay);
-}
-updateAllTideDisplays();
-setInterval(updateAllTideDisplays, 60 * 60 * 1000); // rolls the range forward each hour so "tomorrow" keeps advancing
-setInterval(moveTideNowMarkers, 60 * 1000); // reposition each "now" marker every minute without refetching
-
-/* ---------- Wilmington, NC river hydrograph (Cape Fear River, gauge WLON7) ----------
-   Sourced from NOAA's National Water Prediction Service (NWPS) API — the same
-   official observed + forecast stage data shown on the gauge's own forecast
-   hydrograph page (water.noaa.gov/gauges/WLON7), not astronomical tide
-   predictions. Flood category thresholds (Action/Minor/Moderate/Major) are
-   pulled live from the gauge's own NWPS metadata rather than hardcoded,
-   since the hydrograph's stage datum doesn't necessarily match the MLLW
-   tide datum used by the Wrightsville chart. */
-const WLON7_CAPTION = 'Cape Fear River - Wilmington, NC (WLON7 Forecast Hydrograph)';
 
 async function fetchNwpsGaugeMeta(gaugeId){
   const res = await fetch(`https://api.water.noaa.gov/nwps/v1/gauges/${gaugeId}`);
@@ -1475,7 +1275,9 @@ function interpolateByTime(points, targetMs){
 function renderHydrographChart(el, points, thresholds, caption){
   const nowLineId = `tide-now-line-${el.id}`;
   const nowDotId = `tide-now-dot-${el.id}`;
-  const W = 760, H = 280, padTop = 76, padBottom = 84, padX = 10;
+  // Extra top padding (vs. the plot height) keeps high-tide labels and flood-stage
+  // tags clear of the OBSERVED/FORECAST headers when a peak sits near the top.
+  const W = 760, H = 310, padTop = 106, padBottom = 84, padX = 10;
   const plotH = H - padTop - padBottom;
   const baseline = padTop + plotH;
 
@@ -1643,14 +1445,19 @@ function easternDateParts(date){
 }
 function sameYmd(a, b){ return a.y === b.y && a.m === b.m && a.d === b.d; }
 
-async function updateWilmingtonHydrograph(){
-  const chartEl = document.getElementById('tide-chart-wilm');
+const HYDROGRAPH_STATIONS = [
+  { gaugeId: 'WLON7', elId: 'tide-chart-wilm', caption: 'Cape Fear River - Wilmington, NC' },
+  { gaugeId: 'JMPN7', elId: 'tide-chart', caption: 'Johnnie Mercers Fishing Pier - Wrightsville Beach, NC' },
+];
+
+async function updateHydrograph(station){
+  const chartEl = document.getElementById(station.elId);
   if (!chartEl) return;
   try {
     const [meta, observedRaw, forecastRaw] = await Promise.all([
-      fetchNwpsGaugeMeta('WLON7'),
-      fetchNwpsStageflow('WLON7', 'observed'),
-      fetchNwpsStageflow('WLON7', 'forecast').catch(() => null), // forecast isn't published for every gauge
+      fetchNwpsGaugeMeta(station.gaugeId),
+      fetchNwpsStageflow(station.gaugeId, 'observed'),
+      fetchNwpsStageflow(station.gaugeId, 'forecast').catch(() => null), // forecast isn't published for every gauge
     ]);
 
     const observed = parseNwpsPoints(observedRaw).map(p => ({ ...p, isObserved: true }));
@@ -1673,14 +1480,19 @@ async function updateWilmingtonHydrograph(){
       return;
     }
 
-    renderHydrographChart(chartEl, finalPoints, nwpsFloodThresholds(meta), WLON7_CAPTION);
+    renderHydrographChart(chartEl, finalPoints, nwpsFloodThresholds(meta), station.caption);
   } catch (err){
     chartEl.innerHTML = '';
-    console.error('Wilmington hydrograph fetch failed:', err);
+    console.error(`Hydrograph fetch failed for ${station.gaugeId}:`, err);
   }
 }
-updateWilmingtonHydrograph();
-setInterval(updateWilmingtonHydrograph, 15 * 60 * 1000); // NWPS observed/forecast data refreshes several times a day
+
+function updateAllHydrographs(){
+  HYDROGRAPH_STATIONS.forEach(updateHydrograph);
+}
+updateAllHydrographs();
+setInterval(updateAllHydrographs, 15 * 60 * 1000); // NWPS observed/forecast data refreshes several times a day
+setInterval(moveTideNowMarkers, 60 * 1000); // reposition each "now" marker every minute without refetching
 
 /* ---------- Live SPC Convective Outlooks (multi-region) ----------
    Each county's boundary is real US Census TIGER data, small/simple
