@@ -146,10 +146,21 @@
   .tide-chart-label.height{ fill: var(--text-muted); }
 
   /* Coastal flood threshold highlighting — reuses the same severity palette as SPC outlooks */
-  .flood-action{ fill: var(--status-slgt); }
-  .flood-minor{ fill: var(--status-enh); }
-  .flood-moderate{ fill: var(--status-mdt); }
-  .flood-major{ fill: var(--status-high); }
+  .tide-chart-label.flood-action,
+  .tide-chart-label.height.flood-action,
+  .tide-chart-flood-tag.flood-action{ fill: var(--status-slgt); }
+
+  .tide-chart-label.flood-minor,
+  .tide-chart-label.height.flood-minor,
+  .tide-chart-flood-tag.flood-minor{ fill: var(--status-enh); }
+
+  .tide-chart-label.flood-moderate,
+  .tide-chart-label.height.flood-moderate,
+  .tide-chart-flood-tag.flood-moderate{ fill: var(--status-mdt); }
+
+  .tide-chart-label.flood-major,
+  .tide-chart-label.height.flood-major,
+  .tide-chart-flood-tag.flood-major{ fill: var(--status-high); }
 
   .tide-chart-flood-tag{
     font-family: Georgia, 'Times New Roman', serif;
